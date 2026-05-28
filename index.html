@@ -627,13 +627,8 @@
       </div>
 
       <div class="section-title">Medio de pago</div>
-      <div class="pago-grid">
-        <div class="pago-btn" onclick="selPago('efectivo')" id="pago-efectivo">
-          <span class="pago-icono">💵</span>Efectivo
-        </div>
-        <div class="pago-btn" onclick="selPago('transferencia')" id="pago-transferencia">
-          <span class="pago-icono">🏦</span>Transferencia
-        </div>
+      <div class="pago-grid" id="pagoGrid">
+        <!-- Rendered dynamically -->
       </div>
 
       <div class="total-box">
@@ -698,6 +693,14 @@
     <div class="card">
       <div class="card-title">✅ Transferencias pendientes</div>
       <div id="listaTransf"><div class="empty-state"><div class="icon">🏦</div>Sin pendientes</div></div>
+    </div>
+    <div class="card" style="margin-top:8px">
+      <div class="card-title">💳 Medios de pago</div>
+      <div id="listaMediosPago" style="margin-bottom:12px"></div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="nuevoMedioPago" placeholder="Ej: Post de pago" style="flex:1;background:var(--gris2);border:1px solid var(--gris3);border-radius:8px;padding:10px;color:white;font-family:var(--font-body);font-size:14px">
+        <button class="btn btn-sm btn-rojo" onclick="agregarMedioPago()">+ Agregar</button>
+      </div>
     </div>
     <button class="btn btn-gris" onclick="logout()" style="margin-top:8px">CERRAR SESIÓN</button>
   </div>
@@ -848,6 +851,38 @@ async function login() {
   err.classList.add('show');
 }
 
+function cargarMediosPagoAdmin() {
+  const medios = getMediosPago();
+  const cont = document.getElementById('listaMediosPago');
+  if (!cont) return;
+  cont.innerHTML = medios.map((m, i) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--gris3)">
+      <span style="font-size:14px;color:var(--blanco)">${m}</span>
+      ${medios.length > 1 ? `<button onclick="borrarMedioPago(${i})" style="background:rgba(232,0,29,0.2);color:var(--rojo);border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px">✗ Borrar</button>` : ''}
+    </div>`).join('');
+}
+
+function agregarMedioPago() {
+  const inp = document.getElementById('nuevoMedioPago');
+  const nombre = inp.value.trim().toLowerCase();
+  if (!nombre) return;
+  const medios = getMediosPago();
+  if (medios.includes(nombre)) { alert('Ya existe ese medio de pago.'); return; }
+  medios.push(nombre);
+  saveMediosPago(medios);
+  inp.value = '';
+  cargarMediosPagoAdmin();
+  renderMediosPago();
+}
+
+function borrarMedioPago(idx) {
+  const medios = getMediosPago();
+  medios.splice(idx, 1);
+  saveMediosPago(medios);
+  cargarMediosPagoAdmin();
+  renderMediosPago();
+}
+
 async function logout() {
   try { await db.auth.signOut(); } catch(e) {}
   sessionStorage.removeItem('gp3_session');
@@ -891,6 +926,7 @@ function mostrarApp() {
   if (rol === 'admin' || rol === 'oficina') {
     cargarEventosAdmin();
     cargarTransfPendientes();
+    cargarMediosPagoAdmin();
   }
 }
 
@@ -903,7 +939,7 @@ function showTab(tab) {
 
   if (tab === 'ventas') cargarVentas();
   if (tab === 'cierre') cargarCierre();
-  if (tab === 'admin') { cargarEventosAdmin(); cargarTransfPendientes(); }
+  if (tab === 'admin') { cargarEventosAdmin(); cargarTransfPendientes(); cargarMediosPagoAdmin(); }
   if (tab === 'consolidado') { cargarEventosSelector(); cargarConsolidado(); }
   if (tab === 'historico') cargarHistorico();
 }
@@ -931,11 +967,16 @@ async function cargarEventoActivo() {
       </div>`;
     form.style.display = 'block';
     renderTipos();
+    renderMediosPago();
   } else {
     eventoActivo = null;
     cont.innerHTML = `<div class="empty-state"><div class="icon">🏁</div>No hay evento activo.<br>Pídele a la administradora que active uno.</div>`;
     form.style.display = 'none';
   }
+}
+
+function renderMediosEnVenta() {
+  renderMediosPago();
 }
 
 function renderTipos() {
@@ -971,7 +1012,32 @@ function selTipoIdx(idx) {
 function selPago(pago) {
   pagoSeleccionado = pago;
   document.querySelectorAll('.pago-btn').forEach(b => b.classList.remove('selected'));
-  document.getElementById('pago-' + pago).classList.add('selected');
+  document.querySelectorAll('.pago-btn').forEach(b => {
+    if (b.dataset.pago === pago) b.classList.add('selected');
+  });
+}
+
+function renderMediosPago() {
+  const medios = getMediosPago();
+  const grid = document.getElementById('pagoGrid');
+  if (!grid) return;
+  const iconos = { efectivo: '💵', transferencia: '🏦', 'post de pago': '💳', otro: '💰' };
+  grid.innerHTML = medios.map(m => `
+    <div class="pago-btn" onclick="selPago('${m}')" data-pago="${m}">
+      <span class="pago-icono">${iconos[m.toLowerCase()] || '💰'}</span>${m}
+    </div>`).join('');
+}
+
+function getMediosPago() {
+  try {
+    const saved = localStorage.getItem('gp3_medios_pago');
+    if (saved) return JSON.parse(saved);
+  } catch(e) {}
+  return ['efectivo', 'transferencia', 'post de pago'];
+}
+
+function saveMediosPago(medios) {
+  try { localStorage.setItem('gp3_medios_pago', JSON.stringify(medios)); } catch(e) {}
 }
 
 function cambiarCantidad(delta) {
@@ -1033,7 +1099,7 @@ async function registrarVenta() {
     total,
     moneda: eventoActivo.moneda,
     medio_pago: pagoSeleccionado,
-    estado: pagoSeleccionado === 'efectivo' ? 'confirmada' : 'pendiente',
+    estado: pagoSeleccionado === 'transferencia' ? 'pendiente' : 'confirmada',
     fecha: new Date().toISOString()
   });
 
@@ -1045,7 +1111,7 @@ async function registrarVenta() {
     return;
   }
 
-  const estadoTexto = pagoSeleccionado === 'efectivo' ? '✅ Confirmada' : '🟡 Pendiente de verificación';
+  const estadoTexto = pagoSeleccionado === 'transferencia' ? '🟡 Pendiente de verificación' : '✅ Confirmada';
   ok.textContent = `Venta registrada — ${cantidad} entrada(s) — ${estadoTexto}`;
   mostrarTicket({
     tipo_entrada: tipoObj.nombre,
