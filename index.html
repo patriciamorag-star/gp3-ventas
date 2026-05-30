@@ -1533,7 +1533,7 @@ async function crearUsuario() {
   // Si tiene PIN, crear solo con PIN (sin email)
   if (pin && pin.length === 4) {
     const { error } = await db.from('perfiles').insert({
-      user_id: crypto.randomUUID(),
+      user_id: null,
       nombre, rol, email: email || null, pin
     });
     if (error) { showErr('usuarioError', 'Error: ' + error.message); return; }
