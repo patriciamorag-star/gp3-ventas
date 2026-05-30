@@ -760,8 +760,12 @@
       <input type="email" id="usuarioEmail" placeholder="email@ejemplo.com">
     </div>
     <div class="field">
-      <label>Contraseña temporal</label>
+      <label>Contraseña temporal (para acceso email)</label>
       <input type="text" id="usuarioPass" placeholder="Mínimo 6 caracteres">
+    </div>
+    <div class="field">
+      <label>PIN de 4 dígitos (para acceso rápido)</label>
+      <input type="text" id="usuarioPin" placeholder="Ej: 1234" maxlength="4" inputmode="numeric">
     </div>
     <div class="field">
       <label>Rol</label>
@@ -813,6 +817,42 @@ async function init() {
 }
 
 // ===== AUTH =====
+function mostrarLoginEmail() {
+  document.getElementById('loginEmailForm').style.display = 'block';
+  document.getElementById('loginPinForm').style.display = 'none';
+  document.getElementById('btnModoEmail').style.background = 'var(--rojo)';
+  document.getElementById('btnModoEmail').style.color = 'white';
+  document.getElementById('btnModoPin').style.background = '#333';
+  document.getElementById('btnModoPin').style.color = '#888';
+}
+
+function mostrarLoginPin() {
+  document.getElementById('loginEmailForm').style.display = 'none';
+  document.getElementById('loginPinForm').style.display = 'block';
+  document.getElementById('btnModoPin').style.background = 'var(--rojo)';
+  document.getElementById('btnModoPin').style.color = 'white';
+  document.getElementById('btnModoEmail').style.background = '#333';
+  document.getElementById('btnModoEmail').style.color = '#888';
+}
+
+async function loginPin() {
+  const nombre = document.getElementById('pinNombre').value.trim().toLowerCase();
+  const pin = document.getElementById('pinCodigo').value.trim();
+  const err = document.getElementById('loginError');
+  err.className = 'alert alert-error'; err.textContent = '';
+
+  if (!nombre || !pin) { err.textContent = 'Ingresa tu nombre y PIN.'; err.classList.add('show'); return; }
+  if (pin.length !== 4) { err.textContent = 'El PIN debe tener 4 dígitos.'; err.classList.add('show'); return; }
+
+  const { data, error } = await db.from('perfiles').select('*').ilike('nombre', nombre).eq('pin', pin).single();
+  
+  if (error || !data) { err.textContent = 'Nombre o PIN incorrecto.'; err.classList.add('show'); return; }
+
+  usuario = { id: data.user_id, email: data.email || nombre + '@pin.gp3' };
+  perfilUsuario = { nombre: data.nombre, rol: data.rol || 'vendedora', email: data.email };
+  mostrarApp();
+}
+
 async function login() {
   const email = document.getElementById('loginEmail').value.trim();
   const pass = document.getElementById('loginPass').value;
@@ -1485,21 +1525,36 @@ async function crearUsuario() {
   const nombre = document.getElementById('usuarioNombre').value.trim();
   const email = document.getElementById('usuarioEmail').value.trim();
   const pass = document.getElementById('usuarioPass').value;
+  const pin = document.getElementById('usuarioPin').value.trim();
   const rol = document.getElementById('usuarioRol').value;
 
-  if (!nombre || !email || !pass) { showErr('usuarioError', 'Completa todos los campos.'); return; }
-  if (pass.length < 6) { showErr('usuarioError', 'La contraseña debe tener al menos 6 caracteres.'); return; }
+  if (!nombre) { showErr('usuarioError', 'Ingresa el nombre.'); return; }
 
-  // Crear en auth usando admin API (via edge function o directo)
-  const { data, error } = await db.auth.signUp({ email, password: pass });
-  if (error) { showErr('usuarioError', 'Error: ' + error.message); return; }
-
-  if (data.user) {
-    await db.from('perfiles').insert({ user_id: data.user.id, nombre, rol, email });
+  // Si tiene PIN, crear solo con PIN (sin email)
+  if (pin && pin.length === 4) {
+    const { error } = await db.from('perfiles').insert({
+      user_id: '00000000-0000-0000-0000-' + Date.now().toString().padStart(12,'0'),
+      nombre, rol, email: email || null, pin
+    });
+    if (error) { showErr('usuarioError', 'Error: ' + error.message); return; }
+    cerrarModal('modalUsuario');
+    cargarUsuarios();
+    alert('Vendedora creada con PIN. Ya puede ingresar con nombre + PIN.');
+    return;
   }
 
+  // Si tiene email, crear con email
+  if (!email || !pass) { showErr('usuarioError', 'Ingresa email y contraseña, o un PIN de 4 dígitos.'); return; }
+  if (pass.length < 6) { showErr('usuarioError', 'La contraseña debe tener al menos 6 caracteres.'); return; }
+
+  const { data, error } = await db.auth.signUp({ email, password: pass });
+  if (error) { showErr('usuarioError', 'Error: ' + error.message); return; }
+  if (data.user) {
+    await db.from('perfiles').insert({ user_id: data.user.id, nombre, rol, email, pin: pin||null });
+  }
   cerrarModal('modalUsuario');
-  alert('Usuario creado. El usuario debe confirmar su email antes de ingresar.');
+  cargarUsuarios();
+  alert('Usuario creado con email.');
 }
 
 async function cargarUsuarios() {
