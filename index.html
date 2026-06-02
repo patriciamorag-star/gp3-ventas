@@ -1595,11 +1595,22 @@ async function cargarUsuarios() {
   if (!data || data.length === 0) { cont.innerHTML = '<div style="color:#555;font-size:13px">Sin usuarios.</div>'; return; }
   const roles = { admin: 'tag-admin', vendedora: 'tag-vendedora', oficina: 'tag-oficina' };
   cont.innerHTML = data.map(u => `
-    <div class="venta-row">
-      <strong style="color:var(--blanco)">${u.nombre}</strong>
-      <span class="tag-rol ${roles[u.rol] || ''}">${u.rol}</span>
-      <div class="venta-info" style="margin-top:4px">${u.email || ''}</div>
+    <div class="venta-row" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <div>
+        <strong style="color:var(--blanco)">${u.nombre}</strong>
+        <span class="tag-rol ${roles[u.rol] || ''}">${u.rol}</span>
+        <div class="venta-info" style="margin-top:4px">${u.email || ''}</div>
+      </div>
+      <button onclick="borrarUsuario('${u.id}','${u.nombre}')" style="background:var(--rojo);color:white;border:none;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;flex-shrink:0">BORRAR</button>
     </div>`).join('');
+}
+
+async function borrarUsuario(id, nombre) {
+  if (!confirm('¿Borrar a ' + nombre + '? Esta acción no se puede deshacer.')) return;
+  const { error } = await db.from('perfiles').delete().eq('id', id);
+  if (error) { alert('Error al borrar: ' + error.message); return; }
+  alert(nombre + ' fue eliminado.');
+  cargarUsuarios();
 }
 
 // ===== MODALES =====
