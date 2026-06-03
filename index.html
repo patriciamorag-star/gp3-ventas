@@ -1158,6 +1158,8 @@ function renderTipos() {
       { nombre: 'Invitado Parque Cerrado', precio: 0 },
       { nombre: 'Tercera Edad/Menor General', precio: 0 },
       { nombre: 'Tercera Edad/Menor Parque Cerrado', precio: 0 },
+      { nombre: 'Entrada Día Anterior General', precio: 0 },
+      { nombre: 'Entrada Día Anterior Parque Cerrado', precio: 0 },
     ];
     if (!eventoActivo.tipos_entrada) { tipos = tiposDefaultR; }
     else {
@@ -1168,20 +1170,78 @@ function renderTipos() {
     }
   } catch(e) {
     tipos = [
-      { nombre: 'General', precio: eventoActivo.precio_general },
-      { nombre: 'Parque Cerrado', precio: eventoActivo.precio_parque }
+      { nombre: 'General', precio: eventoActivo.precio_general||0 },
+      { nombre: 'Parque Cerrado', precio: eventoActivo.precio_parque||0 }
     ];
   }
-  grid.innerHTML = tipos.map((t, i) => `
-    <div class="tipo-btn" onclick="selTipoIdx(${i})" id="tipo-idx-${i}">
+
+  // Definir grupos gratuitos
+  const grupos = [
+    { key: 'ticketera', label: '🎟 Ticketera', match: n => n.includes('ticketera') },
+    { key: 'invitado',  label: '🎫 Invitado',  match: n => n.includes('invitado') },
+    { key: 'tercera',   label: '👴 Tercera Edad / Menor', match: n => n.includes('tercera')||n.includes('menor') },
+    { key: 'anterior',  label: '🔄 Día Anterior', match: n => n.includes('anterior') },
+  ];
+
+  // Botones de pago (precio > 0)
+  let html = tipos
+    .map((t, i) => t.precio > 0 ? `<div class="tipo-btn" onclick="selTipoIdx(${i})" id="tipo-idx-${i}">
       <div class="tipo-nombre">${t.nombre}</div>
       <div class="tipo-precio">${formatMonto(t.precio, moneda)}</div>
-    </div>`).join('');
+    </div>` : '')
+    .join('');
+
+  // Botones agrupados para gratuitos
+  grupos.forEach(g => {
+    html += `<div class="tipo-btn tipo-gratuito-btn" id="grupo-btn-${g.key}" onclick="toggleGrupo('${g.key}')" style="position:relative">
+      <div class="tipo-nombre">${g.label}</div>
+      <div class="tipo-precio" style="color:#aaa;font-size:11px">GRATIS ▾</div>
+    </div>`;
+  });
+
+  // Sub-panels (fuera del grid, debajo)
+  let subHtml = grupos.map(g => {
+    const tiposG = tipos.map((t,i) => ({t,i})).filter(({t}) => g.match(t.nombre.toLowerCase()));
+    const genIdx  = tiposG.find(({t}) => t.nombre.toLowerCase().includes('general'))?.i ?? -1;
+    const pcIdx   = tiposG.find(({t}) => !t.nombre.toLowerCase().includes('general'))?.i ?? -1;
+    return `<div id="sub-panel-${g.key}" style="display:none;grid-column:1/-1;background:#1e1e1e;border-radius:10px;padding:10px;margin-top:4px;margin-bottom:4px;border:1px solid #333">
+      <p style="font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">${g.label} — Selecciona categoría:</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        ${genIdx>=0?`<div class="tipo-btn sub-tipo-btn" id="tipo-idx-${genIdx}" onclick="selTipoIdx(${genIdx})"><div class="tipo-nombre">🟢 General</div><div class="tipo-precio" style="color:#4caf50;font-size:11px">GRATIS</div></div>`:''}
+        ${pcIdx>=0?`<div class="tipo-btn sub-tipo-btn" id="tipo-idx-${pcIdx}" onclick="selTipoIdx(${pcIdx})"><div class="tipo-nombre">🔵 Parque Cerrado</div><div class="tipo-precio" style="color:#4a90d9;font-size:11px">GRATIS</div></div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  grid.innerHTML = html + subHtml;
 }
+
+function toggleGrupo(key) {
+  const grupos = ['ticketera','invitado','tercera','anterior'];
+  grupos.forEach(k => {
+    if (k !== key) document.getElementById('sub-panel-'+k).style.display = 'none';
+  });
+  const panel = document.getElementById('sub-panel-'+key);
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
 
 function selTipoIdx(idx) {
   tipoSeleccionado = idx;
   document.querySelectorAll('.tipo-btn').forEach(b => b.classList.remove('selected'));
+  // Cerrar todos los sub-panels
+  ['ticketera','invitado','tercera','anterior'].forEach(k => {
+    const p = document.getElementById('sub-panel-'+k); if(p) p.style.display='none';
+    const b = document.getElementById('grupo-btn-'+k); if(b) b.classList.remove('selected');
+  });
+  // Resaltar grupo padre si es gratuito
+  const tiposHL = getTipos();
+  const tipoHL = tiposHL[idx];
+  if (tipoHL && tipoHL.precio === 0) {
+    const nomHL = tipoHL.nombre.toLowerCase();
+    const keyHL = nomHL.includes('ticketera')?'ticketera':nomHL.includes('invitado')?'invitado':nomHL.includes('tercera')||nomHL.includes('menor')?'tercera':nomHL.includes('anterior')?'anterior':null;
+    if (keyHL) { const gb=document.getElementById('grupo-btn-'+keyHL); if(gb) gb.classList.add('selected'); }
+  }
   document.getElementById('tipo-idx-' + idx).classList.add('selected');
   const tipos = getTipos();
   const tipo = tipos[idx];
@@ -1189,18 +1249,16 @@ function selTipoIdx(idx) {
   const esTicketera = tipo && nombre.includes('ticketera');
   const esInvitado = nombre.includes('invitado');
   const esTerceraOMenor = nombre.includes('tercera') || nombre.includes('menor');
-  const esDiaAnterior = nombre.includes('anterior');
-  const esGratuito = esTicketera || esInvitado || esTerceraOMenor || esDiaAnterior;
-  const necesitaCategoria = esInvitado || esTerceraOMenor || esDiaAnterior;
+  const esGratuito = esTicketera || esInvitado || esTerceraOMenor;
+  const necesitaCategoria = esInvitado || esTerceraOMenor;
   const pagoSection = document.getElementById('pagoSection');
   if (pagoSection) pagoSection.style.display = esGratuito ? 'none' : 'block';
   if (esTicketera) pagoSeleccionado = 'ticketera';
-  if (esInvitado) pagoSeleccionado = 'invitado';
+  if (esInvitado) pagoSeleccionado = 'gratuito';
   if (esTerceraOMenor) pagoSeleccionado = 'gratuito';
-  if (nombre.includes('anterior')) pagoSeleccionado = 'reingreso';
   // Categoría pulsera — invitado, tercera edad y menor eligen categoría
   const catSection = document.getElementById('categoriaPulseraSection');
-  if (catSection) catSection.style.display = necesitaCategoria ? 'block' : 'none';
+  if (catSection) catSection.style.display = 'none'; // Sub-botones manejan la categoría
   if (!necesitaCategoria) categoriaPulseraSeleccionada = null;
   // Reset foto comprobante
   document.getElementById('fotoComprobanteSection').style.display = 'none';
@@ -1258,8 +1316,6 @@ function getTipos() {
     { nombre: 'Invitado Parque Cerrado', precio: 0 },
     { nombre: 'Tercera Edad/Menor General', precio: 0 },
     { nombre: 'Tercera Edad/Menor Parque Cerrado', precio: 0 },
-    { nombre: 'Entrada Día Anterior General', precio: 0 },
-    { nombre: 'Entrada Día Anterior Parque Cerrado', precio: 0 },
   ];
   try {
     if (!eventoActivo.tipos_entrada) return tiposDefault;
@@ -1309,9 +1365,16 @@ function calcularTotal() {
   const esTicketera = tipo.nombre.toLowerCase().includes('ticketera') || tipo.precio === 0;
   const total = tipo.precio * cantidad;
   const moneda = eventoActivo.moneda;
-  if (esTicketera) {
+  if (tipo.precio === 0) {
+    const nomC = tipo.nombre.toLowerCase();
+    let labelG;
+    if (nomC.includes('ticketera')) labelG = 'Pago por Ticketera';
+    else if (nomC.includes('invitado')) labelG = 'Invitado — Sin cobro';
+    else if (nomC.includes('tercera')||nomC.includes('menor')) labelG = 'Tercera Edad/Menor — Sin cobro';
+    else if (nomC.includes('anterior')) labelG = 'Reingreso día anterior — Sin cobro';
+    else labelG = 'Sin cobro';
     document.getElementById('totalMonto').textContent = 'GRATIS';
-    document.getElementById('totalDetalle').textContent = 'Pagado por ticketera · ' + cantidad + ' entrada(s)';
+    document.getElementById('totalDetalle').textContent = labelG + ' · ' + cantidad + ' entrada(s)';
   } else {
     document.getElementById('totalMonto').textContent = formatMonto(total, moneda);
     document.getElementById('totalDetalle').textContent = cantidad + ' × ' + formatMonto(tipo.precio, moneda);
@@ -1342,8 +1405,7 @@ async function registrarVenta() {
   const nombreTipo = tipoObj.nombre.toLowerCase();
   const esTerceraOMenorV = nombreTipo.includes('tercera') || nombreTipo.includes('menor');
   const esInvitadoV = nombreTipo.includes('invitado');
-  const esDiaAnteriorV = nombreTipo.includes('anterior');
-  const necesitaCatV = esTerceraOMenorV || esInvitadoV || esDiaAnteriorV;
+  const necesitaCatV = esTerceraOMenorV || esInvitadoV;
   if (necesitaCatV && !categoriaPulseraSeleccionada) {
     showErr('ventaError', 'Selecciona la categoría de pulsera (General o Parque Cerrado).');
     btn.disabled = false; btn.innerHTML = 'REGISTRAR VENTA'; return;
@@ -1359,15 +1421,15 @@ async function registrarVenta() {
     else if (nombreTipo.includes('parque') || esInvitadoV) catPulsera = 'parque_cerrado';
     else if (nombreTipo.includes('vip')) catPulsera = 'vip';
   }
-  // Determinar medio_pago correcto según tipo
+  // Medio de pago correcto según tipo
   let medioFinal;
   if (esTicketera) medioFinal = 'ticketera';
   else if (esInvitadoV) medioFinal = 'invitado';
   else if (esTerceraOMenorV) medioFinal = 'gratuito';
-  else if (nombreTipo.includes('anterior')) medioFinal = 'reingreso';
+  else if (esDiaAnteriorV) medioFinal = 'reingreso';
   else medioFinal = pagoSeleccionado;
-  const esGratuitoV = esTicketera || esInvitadoV || esTerceraOMenorV || nombreTipo.includes('anterior');
-  const estadoFinal = esGratuitoV ? 'confirmada' : pagoSeleccionado === 'transferencia' ? 'pendiente' : 'confirmada';
+  const esGratuitoFinal = esTicketera || esInvitadoV || esTerceraOMenorV || esDiaAnteriorV;
+  const estadoFinal = esGratuitoFinal ? 'confirmada' : pagoSeleccionado === 'transferencia' ? 'pendiente' : 'confirmada';
   const { error } = await db.from('ventas').insert({
     evento_id: eventoActivo.id,
     vendedor_id: usuario.id,
@@ -1388,7 +1450,7 @@ async function registrarVenta() {
   btn.innerHTML = 'REGISTRAR VENTA';
 
   if (!error) {
-    if (!tipoObj.nombre.toLowerCase().includes('anterior')) await descontarPulsera(usuario.id, tipoObj.nombre, catPulsera);
+    if (!tipoObj.nombre.toLowerCase().includes('anterior')) { await descontarPulsera(usuario.id, tipoObj.nombre, catPulsera); }
   }
 
   if (error) {
@@ -1844,8 +1906,6 @@ function abrirModalEvento() {
       {nombre:'Invitado Parque Cerrado', precio:'0'},
       {nombre:'Tercera Edad/Menor General', precio:'0'},
       {nombre:'Tercera Edad/Menor Parque Cerrado', precio:'0'},
-      {nombre:'Entrada Día Anterior General', precio:'0'},
-      {nombre:'Entrada Día Anterior Parque Cerrado', precio:'0'},
     ];
     cont.innerHTML = tipos.map(t => `
       <div class="tipo-input-row" style="display:flex;gap:8px;margin-bottom:8px">
@@ -2403,7 +2463,7 @@ async function cargarResumenStock(){
   await cargarResumenAsignacion();
   document.getElementById('resumenStock').innerHTML=document.getElementById('resumenAsignacion').innerHTML;
   // Detalle
-  const {data}=await dbP.from('pulseras').select('id,numero,tipo,estado,vendedor_nombre').eq('evento_id',ev.id).order('numero');
+  const {data}=await dbP.from('pulseras').select('numero,tipo,estado').eq('evento_id',ev.id).order('numero');
   const det=document.getElementById('detalleStock');
   if(!data||data.length===0){det.innerHTML='';return;}
   const colores={sin_asignar:'#555',general:'#4caf50',parque_cerrado:'#4a90d9',vip:'#f0a800'};
