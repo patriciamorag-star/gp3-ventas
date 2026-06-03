@@ -643,9 +643,36 @@
         <button onclick="cambiarCantidad(1)">+</button>
       </div>
 
+      <!-- Categoría pulsera para tercera edad / menor -->
+      <div id="categoriaPulseraSection" style="display:none;margin-bottom:16px">
+        <div class="section-title">Categoría de pulsera</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <button id="catGenBtn" onclick="selCategoriaPulsera('general')" style="background:#1e4d1e;border:2px solid #4caf50;border-radius:10px;padding:12px;color:#4caf50;font-weight:700;font-size:14px;cursor:pointer;font-family:var(--font-body)">🟢 General</button>
+          <button id="catPCBtn" onclick="selCategoriaPulsera('parque_cerrado')" style="background:#1a3a6a;border:2px solid #4a90d9;border-radius:10px;padding:12px;color:#4a90d9;font-weight:700;font-size:14px;cursor:pointer;font-family:var(--font-body)">🔵 Parque Cerrado</button>
+        </div>
+      </div>
+
       <div class="section-title">Medio de pago</div>
       <div class="pago-grid" id="pagoGrid">
         <!-- Rendered dynamically -->
+      </div>
+
+      <!-- Foto comprobante transferencia -->
+      <div id="fotoComprobanteSection" style="display:none;margin-top:10px;margin-bottom:4px">
+        <div style="border:1.5px dashed #444;border-radius:10px;padding:14px;background:#1a1a1a;text-align:center" id="fotoCompZona">
+          <p style="font-size:12px;color:#888;margin-bottom:10px">📎 Foto del comprobante (opcional)</p>
+          <div style="display:flex;gap:8px;justify-content:center">
+            <button class="btn btn-gris btn-sm" onclick="document.getElementById('fotoCompGal').click()">🖼 Galería</button>
+            <button class="btn btn-gris btn-sm" onclick="document.getElementById('fotoCompCam').click()">📷 Cámara</button>
+          </div>
+          <input type="file" id="fotoCompGal" accept="image/*" style="display:none" onchange="cargarFotoComp(this)">
+          <input type="file" id="fotoCompCam" accept="image/*" capture="environment" style="display:none" onchange="cargarFotoComp(this)">
+        </div>
+        <div id="fotoCompPreview" style="display:none;margin-top:8px;background:#0d1f0d;border:1px solid #4caf50;border-radius:8px;padding:8px;display:none;align-items:center;gap:8px">
+          <img id="fotoCompThumb" style="height:40px;width:40px;object-fit:cover;border-radius:6px">
+          <span style="font-size:12px;color:#4caf50;flex:1">✓ Comprobante adjunto</span>
+          <button onclick="quitarFotoComp()" style="background:none;border:none;color:#e8001d;cursor:pointer;font-size:14px">× quitar</button>
+        </div>
       </div>
 
       <div class="total-box">
@@ -887,6 +914,8 @@ let perfilUsuario = null;
 let eventoActivo = null;
 let tipoSeleccionado = null;
 let pagoSeleccionado = null;
+let categoriaPulseraSeleccionada = null;
+let fotoComprobanteBase64 = null;
 
 // ===== INIT =====
 async function init() {
@@ -1143,10 +1172,22 @@ function selTipoIdx(idx) {
   document.getElementById('tipo-idx-' + idx).classList.add('selected');
   const tipos = getTipos();
   const tipo = tipos[idx];
-  const esTicketera = tipo && (tipo.nombre.toLowerCase().includes('ticketera') || tipo.precio === 0);
+  const nombre = tipo ? tipo.nombre.toLowerCase() : '';
+  const esTicketera = tipo && (nombre.includes('ticketera') || tipo.precio === 0);
+  const esInvitado = nombre.includes('invitado');
+  const esTerceraOMenor = nombre.includes('tercera') || nombre.includes('menor');
+  const necesitaCategoria = esTerceraOMenor || esInvitado;
   const pagoSection = document.getElementById('pagoSection');
-  if (pagoSection) pagoSection.style.display = esTicketera ? 'none' : 'block';
+  if (pagoSection) pagoSection.style.display = (esTicketera || esInvitado) ? 'none' : 'block';
   if (esTicketera) pagoSeleccionado = 'ticketera';
+  if (esInvitado) pagoSeleccionado = 'gratuito';
+  // Categoría pulsera — invitado, tercera edad y menor eligen categoría
+  const catSection = document.getElementById('categoriaPulseraSection');
+  if (catSection) catSection.style.display = necesitaCategoria ? 'block' : 'none';
+  if (!necesitaCategoria) categoriaPulseraSeleccionada = null;
+  // Reset foto comprobante
+  document.getElementById('fotoComprobanteSection').style.display = 'none';
+  fotoComprobanteBase64 = null;
   calcularTotal();
 }
 
@@ -1156,6 +1197,9 @@ function selPago(pago) {
   document.querySelectorAll('.pago-btn').forEach(b => {
     if (b.dataset.pago === pago) b.classList.add('selected');
   });
+  const fotoSection = document.getElementById('fotoComprobanteSection');
+  if (fotoSection) fotoSection.style.display = pago === 'transferencia' ? 'block' : 'none';
+  if (pago !== 'transferencia') { fotoComprobanteBase64 = null; }
 }
 
 function renderMediosPago() {
@@ -1201,6 +1245,35 @@ function getTipos() {
   }
 }
 
+function selCategoriaPulsera(cat) {
+  categoriaPulseraSeleccionada = cat;
+  document.getElementById('catGenBtn').style.opacity = cat === 'general' ? '1' : '0.4';
+  document.getElementById('catPCBtn').style.opacity = cat === 'parque_cerrado' ? '1' : '0.4';
+  document.getElementById('catGenBtn').style.borderWidth = cat === 'general' ? '3px' : '2px';
+  document.getElementById('catPCBtn').style.borderWidth = cat === 'parque_cerrado' ? '3px' : '2px';
+}
+
+function cargarFotoComp(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    fotoComprobanteBase64 = e.target.result;
+    document.getElementById('fotoCompZona').style.display = 'none';
+    const prev = document.getElementById('fotoCompPreview');
+    prev.style.display = 'flex';
+    document.getElementById('fotoCompThumb').src = fotoComprobanteBase64;
+  };
+  reader.readAsDataURL(file);
+}
+
+function quitarFotoComp() {
+  fotoComprobanteBase64 = null;
+  document.getElementById('fotoCompGal').value = '';
+  document.getElementById('fotoCompCam').value = '';
+  document.getElementById('fotoCompPreview').style.display = 'none';
+  document.getElementById('fotoCompZona').style.display = 'block';
+}
+
 function calcularTotal() {
   if (!eventoActivo || tipoSeleccionado === null) return;
   const cantidad = parseInt(document.getElementById('cantidad').value);
@@ -1239,6 +1312,24 @@ async function registrarVenta() {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>REGISTRANDO...';
 
+  // Validar categoría pulsera para tercera edad/menor
+  const nombreTipo = tipoObj.nombre.toLowerCase();
+  const esTerceraOMenorV = nombreTipo.includes('tercera') || nombreTipo.includes('menor');
+  const esInvitadoV = nombreTipo.includes('invitado');
+  const necesitaCatV = esTerceraOMenorV || esInvitadoV;
+  if (necesitaCatV && !categoriaPulseraSeleccionada) {
+    showErr('ventaError', 'Selecciona la categoría de pulsera (General o Parque Cerrado).');
+    btn.disabled = false; btn.innerHTML = 'REGISTRAR VENTA'; return;
+  }
+  // Determinar categoría pulsera
+  let catPulsera = categoriaPulseraSeleccionada;
+  if (!catPulsera) {
+    if (nombreTipo.includes('general')) catPulsera = 'general';
+    else if (nombreTipo.includes('parque') || esInvitadoV) catPulsera = 'parque_cerrado';
+    else if (nombreTipo.includes('vip')) catPulsera = 'vip';
+  }
+  const medioFinal = esTicketera ? 'ticketera' : esInvitadoV ? 'gratuito' : pagoSeleccionado;
+  const estadoFinal = (esTicketera || esInvitadoV) ? 'confirmada' : pagoSeleccionado === 'transferencia' ? 'pendiente' : 'confirmada';
   const { error } = await db.from('ventas').insert({
     evento_id: eventoActivo.id,
     vendedor_id: usuario.id,
@@ -1248,16 +1339,18 @@ async function registrarVenta() {
     precio_unitario: precio,
     total,
     moneda: eventoActivo.moneda,
-    medio_pago: esTicketera ? 'ticketera' : pagoSeleccionado,
-    estado: esTicketera ? 'confirmada' : pagoSeleccionado === 'transferencia' ? 'pendiente' : 'confirmada',
-    fecha: new Date().toISOString()
+    medio_pago: medioFinal,
+    estado: estadoFinal,
+    fecha: new Date().toISOString(),
+    foto_comprobante: fotoComprobanteBase64 || null,
+    categoria_pulsera: catPulsera || null
   });
 
   btn.disabled = false;
   btn.innerHTML = 'REGISTRAR VENTA';
 
   if (!error) {
-    await descontarPulsera(usuario.id, tipoObj.nombre);
+    await descontarPulsera(usuario.id, tipoObj.nombre, catPulsera);
   }
 
   if (error) {
@@ -2143,10 +2236,15 @@ async function cargarListaCargadas(){
   const cont=document.getElementById('listaCargadas'); if(!cont)return;
   if(!data||data.length===0){cont.innerHTML='<p style="font-size:12px;color:#555;text-align:center;padding:8px">Sin pulseras cargadas aún</p>';return;}
   const colores={sin_asignar:'#666',general:'#4caf50',parque_cerrado:'#4a90d9',vip:'#f0a800'};
-  cont.innerHTML='<p style="font-size:11px;color:#555;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Últimas cargadas</p>'+
-    data.map(p=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #222;font-size:12px">
-      <span style="font-weight:700;color:#f0a800;letter-spacing:2px">#${p.numero}</span>
-      <span style="font-size:10px;color:${colores[p.tipo]||'#666'}">${p.tipo==='sin_asignar'?'Sin asignar':p.tipo}</span>
+  cont.innerHTML='<p style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px;margin:8px 0 6px">Detalle completo ('+data.length.toLocaleString()+' pulseras)</p>'+
+    data.map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #1a1a1a;font-size:11px;gap:6px">
+      <span style="font-weight:700;color:#f0a800;letter-spacing:1px;min-width:60px">#${p.numero}</span>
+      <span style="color:${colores[p.tipo]||'#666'};flex:1">${p.tipo==='sin_asignar'?'Sin asignar':p.tipo==='general'?'General':p.tipo==='parque_cerrado'?'Parque Cerrado':'VIP'}</span>
+      <span style="color:${p.estado==='disponible'?'#4caf50':p.estado==='asignada'?'#4a90d9':'#e8001d'};min-width:55px">${p.estado}</span>
+      <div style="display:flex;gap:4px">
+        <button onclick="editarPulsera('${p.id}','${p.numero}')" style="background:#1a3a6a;border:1px solid #4a90d9;border-radius:4px;color:#4a90d9;cursor:pointer;padding:2px 6px;font-size:10px">✏️</button>
+        <button onclick="borrarPulsera('${p.id}','${p.numero}')" style="background:#3a0808;border:1px solid #e8001d;border-radius:4px;color:#e8001d;cursor:pointer;padding:2px 6px;font-size:10px">🗑</button>
+      </div>
     </div>`).join('');
 }
 
@@ -2256,6 +2354,22 @@ async function cargarResumenStock(){
     </div>`).join('');
 }
 
+async function editarPulsera(id, numeroActual) {
+  const nuevo = prompt('Número actual: '+numeroActual+'\nIngresa el número correcto:', numeroActual);
+  if(!nuevo||nuevo===numeroActual)return;
+  const {error}=await dbP.from('pulseras').update({numero:nuevo}).eq('id',id);
+  if(error){alert('Error: '+error.message);return;}
+  alert('✅ Pulsera actualizada: #'+nuevo);
+  cargarResumenStock();
+}
+
+async function borrarPulsera(id, numero) {
+  if(!confirm('¿Borrar pulsera #'+numero+'? Esta acción no se puede deshacer.'))return;
+  const {error}=await dbP.from('pulseras').delete().eq('id',id);
+  if(error){alert('Error: '+error.message);return;}
+  cargarResumenStock();
+}
+
 async function exportarExcelPulseras(){
   const ev=await getEventoActivo(); if(!ev)return;
   const {data:lotes}=await dbP.from('pulseras_lotes').select('*').eq('evento_id',ev.id);
@@ -2280,11 +2394,15 @@ async function exportarExcelPulseras(){
   XLSX.writeFile(wb,'pulseras-'+new Date().toISOString().split('T')[0]+'.xlsx');
 }
 
-async function descontarPulsera(vendedorId, tipoEntrada) {
+async function descontarPulsera(vendedorId, tipoEntrada, catPulsera) {
   const ev=await getEventoActivo(); if(!ev)return;
-  const tipo=tipoEntrada.toLowerCase().includes('parque')?'parque_cerrado':
-             tipoEntrada.toLowerCase().includes('general')?'general':
-             tipoEntrada.toLowerCase().includes('vip')?'vip':null;
+  let tipo = catPulsera || null;
+  if(!tipo){
+    const n=tipoEntrada.toLowerCase();
+    tipo=n.includes('parque')||n.includes('invitado')?'parque_cerrado':
+         n.includes('general')?'general':
+         n.includes('vip')?'vip':null;
+  }
   if(!tipo)return;
   const {data:sig}=await dbP.from('pulseras').select('id').eq('evento_id',ev.id).eq('tipo',tipo).eq('estado','asignada').order('numero').limit(1);
   if(sig&&sig.length>0) await dbP.from('pulseras').update({estado:'vendida'}).eq('id',sig[0].id);
