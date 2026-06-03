@@ -1149,10 +1149,23 @@ function renderTipos() {
   const moneda = eventoActivo.moneda;
   let tipos = [];
   try {
-    tipos = eventoActivo.tipos_entrada ? JSON.parse(eventoActivo.tipos_entrada) : [
-      { nombre: 'General', precio: eventoActivo.precio_general },
-      { nombre: 'Parque Cerrado', precio: eventoActivo.precio_parque }
+    const tiposDefaultR = [
+      { nombre: 'General', precio: eventoActivo.precio_general||0 },
+      { nombre: 'Parque Cerrado', precio: eventoActivo.precio_parque||0 },
+      { nombre: 'Ticketera General', precio: 0 },
+      { nombre: 'Ticketera Parque Cerrado', precio: 0 },
+      { nombre: 'Invitado General', precio: 0 },
+      { nombre: 'Invitado Parque Cerrado', precio: 0 },
+      { nombre: 'Tercera Edad/Menor General', precio: 0 },
+      { nombre: 'Tercera Edad/Menor Parque Cerrado', precio: 0 },
     ];
+    if (!eventoActivo.tipos_entrada) { tipos = tiposDefaultR; }
+    else {
+      const parsed = JSON.parse(eventoActivo.tipos_entrada);
+      const nombres = parsed.map(t=>t.nombre.toLowerCase());
+      const extras = tiposDefaultR.filter(t=>t.precio===0&&!nombres.includes(t.nombre.toLowerCase()));
+      tipos = [...parsed, ...extras];
+    }
   } catch(e) {
     tipos = [
       { nombre: 'General', precio: eventoActivo.precio_general },
@@ -1173,14 +1186,16 @@ function selTipoIdx(idx) {
   const tipos = getTipos();
   const tipo = tipos[idx];
   const nombre = tipo ? tipo.nombre.toLowerCase() : '';
-  const esTicketera = tipo && (nombre.includes('ticketera') || tipo.precio === 0);
+  const esTicketera = tipo && nombre.includes('ticketera');
   const esInvitado = nombre.includes('invitado');
   const esTerceraOMenor = nombre.includes('tercera') || nombre.includes('menor');
-  const necesitaCategoria = esTerceraOMenor || esInvitado;
+  const esGratuito = esTicketera || esInvitado || esTerceraOMenor;
+  const necesitaCategoria = esInvitado || esTerceraOMenor;
   const pagoSection = document.getElementById('pagoSection');
-  if (pagoSection) pagoSection.style.display = (esTicketera || esInvitado) ? 'none' : 'block';
+  if (pagoSection) pagoSection.style.display = esGratuito ? 'none' : 'block';
   if (esTicketera) pagoSeleccionado = 'ticketera';
   if (esInvitado) pagoSeleccionado = 'gratuito';
+  if (esTerceraOMenor) pagoSeleccionado = 'gratuito';
   // Categoría pulsera — invitado, tercera edad y menor eligen categoría
   const catSection = document.getElementById('categoriaPulseraSection');
   if (catSection) catSection.style.display = necesitaCategoria ? 'block' : 'none';
@@ -1232,17 +1247,24 @@ function cambiarCantidad(delta) {
 }
 
 function getTipos() {
+  const tiposDefault = [
+    { nombre: 'General', precio: eventoActivo.precio_general || 0 },
+    { nombre: 'Parque Cerrado', precio: eventoActivo.precio_parque || 0 },
+    { nombre: 'Ticketera General', precio: 0 },
+    { nombre: 'Ticketera Parque Cerrado', precio: 0 },
+    { nombre: 'Invitado General', precio: 0 },
+    { nombre: 'Invitado Parque Cerrado', precio: 0 },
+    { nombre: 'Tercera Edad/Menor General', precio: 0 },
+    { nombre: 'Tercera Edad/Menor Parque Cerrado', precio: 0 },
+  ];
   try {
-    return eventoActivo.tipos_entrada ? JSON.parse(eventoActivo.tipos_entrada) : [
-      { nombre: 'General', precio: eventoActivo.precio_general },
-      { nombre: 'Parque Cerrado', precio: eventoActivo.precio_parque }
-    ];
-  } catch(e) {
-    return [
-      { nombre: 'General', precio: eventoActivo.precio_general },
-      { nombre: 'Parque Cerrado', precio: eventoActivo.precio_parque }
-    ];
-  }
+    if (!eventoActivo.tipos_entrada) return tiposDefault;
+    const parsed = JSON.parse(eventoActivo.tipos_entrada);
+    // Fusionar: mantener tipos guardados + agregar gratuitos si no están
+    const nombres = parsed.map(t => t.nombre.toLowerCase());
+    const extras = tiposDefault.filter(t => t.precio === 0 && !nombres.includes(t.nombre.toLowerCase()));
+    return [...parsed, ...extras];
+  } catch(e) { return tiposDefault; }
 }
 
 function selCategoriaPulsera(cat) {
@@ -1676,11 +1698,12 @@ async function crearEvento() {
   nombreInputs.forEach((inp, i) => {
     const n = inp.value.trim();
     const p = parseFloat(precioInputs[i].value);
-    if (n && !isNaN(p) && p > 0) tipos.push({ nombre: n, precio: p });
+    if (n && !isNaN(p) && p >= 0) tipos.push({ nombre: n, precio: p });
   });
 
   if (!nombre || !fecha) { showErr('eventoError', 'Completa nombre y fecha.'); return; }
-  if (tipos.length === 0) { showErr('eventoError', 'Agrega al menos un tipo de entrada con precio.'); return; }
+  const tiposPago = tipos.filter(t => t.precio > 0);
+  if (tiposPago.length === 0) { showErr('eventoError', 'Agrega al menos General o Parque Cerrado con precio.'); return; }
 
   const { data, error } = await db.from('eventos').insert({ 
     nombre, fecha, moneda, 
@@ -1797,6 +1820,25 @@ function abrirModalEvento() {
   document.getElementById('modalEvento').classList.add('show');
   const hoy = new Date().toISOString().split('T')[0];
   document.getElementById('eventoFecha').value = hoy;
+  // Pre-poblar tipos estándar
+  const cont = document.getElementById('tiposContainer');
+  if (cont) {
+    const tipos = [
+      {nombre:'General', precio:''},
+      {nombre:'Parque Cerrado', precio:''},
+      {nombre:'Ticketera General', precio:'0'},
+      {nombre:'Ticketera Parque Cerrado', precio:'0'},
+      {nombre:'Invitado General', precio:'0'},
+      {nombre:'Invitado Parque Cerrado', precio:'0'},
+      {nombre:'Tercera Edad/Menor General', precio:'0'},
+      {nombre:'Tercera Edad/Menor Parque Cerrado', precio:'0'},
+    ];
+    cont.innerHTML = tipos.map(t => `
+      <div class="tipo-input-row" style="display:flex;gap:8px;margin-bottom:8px">
+        <input type="text" class="tipo-nombre-input" placeholder="Nombre" value="${t.nombre}" style="flex:2;background:var(--gris2);border:1px solid var(--gris3);border-radius:8px;padding:10px;color:white;font-family:var(--font-body)">
+        <input type="number" class="tipo-precio-input" placeholder="Precio" value="${t.precio}" style="flex:1;background:var(--gris2);border:1px solid var(--gris3);border-radius:8px;padding:10px;color:white;font-family:var(--font-body)">
+      </div>`).join('');
+  }
 }
 function abrirModalUsuario() {
   document.getElementById('modalUsuario').classList.add('show');
@@ -2370,9 +2412,12 @@ async function editarPulsera(id, numeroActual) {
 
 async function borrarPulsera(id, numero) {
   if(!confirm('¿Borrar pulsera #'+numero+'? Esta acción no se puede deshacer.'))return;
-  const {error}=await dbP.from('pulseras').delete().eq('id',id);
-  if(error){alert('Error: '+error.message);return;}
-  cargarResumenStock();
+  try {
+    const {error}=await dbP.from('pulseras').delete().eq('id',id);
+    if(error){alert('Error al borrar: '+error.message+' (id:'+id+')');return;}
+    alert('✅ Pulsera #'+numero+' eliminada.');
+    cargarResumenStock();
+  } catch(e){alert('Error inesperado: '+e.message);}
 }
 
 async function exportarExcelPulseras(){
