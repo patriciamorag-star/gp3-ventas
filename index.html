@@ -721,31 +721,78 @@
     </div>
     <div class="card" style="margin-top:8px">
       <div class="card-title">🎫 Pulseras</div>
-      <div style="margin-bottom:12px">
-        <p style="font-size:12px;color:#aaa;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Stock inicial del evento activo</p>
-        <div style="display:grid;grid-template-columns:1fr 1fr 90px;gap:8px;margin-bottom:8px">
-          <select id="pulseraTipo" style="background:var(--gris2);border:1px solid var(--gris3);border-radius:8px;padding:8px;color:white;font-family:var(--font-body)">
-            <option value="general">General</option>
-            <option value="parque_cerrado">Parque Cerrado</option>
+      <!-- Mini tabs -->
+      <div style="display:flex;border-bottom:1px solid var(--gris3);margin-bottom:14px">
+        <button id="ptbCargar" onclick="pulseraTab('Cargar',this)" style="flex:1;background:none;border:none;border-bottom:2px solid var(--rojo);color:white;font-weight:600;padding:8px;cursor:pointer;font-size:12px">📷 CARGAR</button>
+        <button id="ptbAsignar" onclick="pulseraTab('Asignar',this)" style="flex:1;background:none;border:none;border-bottom:2px solid transparent;color:#666;padding:8px;cursor:pointer;font-size:12px">👤 ASIGNAR</button>
+        <button id="ptbVer" onclick="pulseraTab('Ver',this)" style="flex:1;background:none;border:none;border-bottom:2px solid transparent;color:#666;padding:8px;cursor:pointer;font-size:12px">📋 VER STOCK</button>
+      </div>
+
+      <!-- TAB CARGAR -->
+      <div id="ptCargar">
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <select id="cargaTipo" style="flex:1;background:var(--gris2);border:1px solid var(--gris3);border-radius:8px;padding:8px;color:white;font-family:var(--font-body)">
+            <option value="general">🟢 General</option>
+            <option value="parque_cerrado">🔵 Parque Cerrado</option>
           </select>
-          <input type="number" id="pulseraStock" placeholder="Cantidad" style="background:var(--gris2);border:1px solid var(--gris3);border-radius:8px;padding:8px;color:white;font-family:var(--font-body)">
-          <button class="btn btn-sm btn-rojo" onclick="cargarStockPulseras()" style="padding:8px">Cargar</button>
         </div>
-        <p style="font-size:12px;color:#aaa;margin-bottom:8px;margin-top:12px;text-transform:uppercase;letter-spacing:.5px">Asignar lote a vendedora</p>
+        <div id="ocrZonaAdmin" style="border:2px dashed #555;border-radius:10px;padding:16px;text-align:center;background:#1a1a1a;margin-bottom:10px">
+          <p style="font-size:13px;color:#777;margin-bottom:10px" id="ocrAdminMsg">📷 Saca foto a la pulsera para leer el número</p>
+          <div style="display:flex;gap:8px;justify-content:center">
+            <button class="btn btn-gris btn-sm" onclick="document.getElementById('ocrGaleria').click()">🖼 Galería</button>
+            <button class="btn btn-gris btn-sm" onclick="document.getElementById('ocrCamara').click()">📷 Cámara</button>
+          </div>
+          <input type="file" id="ocrGaleria" accept="image/*" style="display:none" onchange="procesarOcrAdmin(this)">
+          <input type="file" id="ocrCamara" accept="image/*" capture="environment" style="display:none" onchange="procesarOcrAdmin(this)">
+        </div>
+        <div id="ocrAdminResultado" style="display:none;margin-bottom:10px">
+          <img id="ocrAdminFoto" style="max-height:100px;border-radius:8px;border:1px solid #333;display:block;margin:0 auto 10px">
+          <label style="font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Número detectado — confirma o corrige</label>
+          <input type="text" id="ocrAdminNumero" placeholder="Número de pulsera" style="background:var(--gris2);border:1px solid var(--gris3);border-radius:8px;padding:10px;color:white;font-family:var(--font-body);font-size:18px;font-weight:700;letter-spacing:3px;text-align:center;width:100%;margin-bottom:8px">
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-gris btn-sm" onclick="resetOcrAdmin()" style="flex:1;justify-content:center">↩ Nueva foto</button>
+            <button class="btn btn-rojo btn-sm" onclick="agregarPulseraStock()" style="flex:2;justify-content:center">+ Agregar al stock</button>
+          </div>
+        </div>
+        <p id="ocrAdminMsg2" style="font-size:12px;color:#4caf50;display:none;margin-bottom:8px"></p>
+        <div id="listaCargadas" style="max-height:200px;overflow-y:auto"></div>
+      </div>
+
+      <!-- TAB ASIGNAR -->
+      <div id="ptAsignar" style="display:none">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
           <select id="loteVendedora" style="background:var(--gris2);border:1px solid var(--gris3);border-radius:8px;padding:8px;color:white;font-family:var(--font-body)"></select>
           <select id="loteTipo" style="background:var(--gris2);border:1px solid var(--gris3);border-radius:8px;padding:8px;color:white;font-family:var(--font-body)">
-            <option value="general">General</option>
-            <option value="parque_cerrado">Parque Cerrado</option>
+            <option value="general">🟢 General</option>
+            <option value="parque_cerrado">🔵 Parque Cerrado</option>
           </select>
         </div>
         <div style="display:grid;grid-template-columns:1fr 90px;gap:8px;margin-bottom:8px">
           <input type="number" id="loteCantidad" placeholder="Cantidad a asignar" style="background:var(--gris2);border:1px solid var(--gris3);border-radius:8px;padding:8px;color:white;font-family:var(--font-body)">
-          <button class="btn btn-sm btn-rojo" onclick="asignarLotePulseras()" style="padding:8px">Asignar</button>
+          <button class="btn btn-sm btn-rojo" onclick="asignarLotePulseras()">Asignar</button>
         </div>
-        <p id="pulseraMsg" style="font-size:12px;color:#4caf50;display:none;margin-top:4px"></p>
+        <p id="pulseraMsg" style="font-size:12px;color:#4caf50;display:none;margin-bottom:8px"></p>
+        <div id="resumenPulseras"></div>
       </div>
-      <div id="resumenPulseras"></div>
+
+      <!-- TAB VER STOCK -->
+      <div id="ptVer" style="display:none">
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <select id="verTipo" onchange="cargarVerStock()" style="flex:1;background:var(--gris2);border:1px solid var(--gris3);border-radius:8px;padding:8px;color:white;font-family:var(--font-body)">
+            <option value="">Todos los tipos</option>
+            <option value="general">🟢 General</option>
+            <option value="parque_cerrado">🔵 Parque Cerrado</option>
+          </select>
+          <select id="verEstado" onchange="cargarVerStock()" style="flex:1;background:var(--gris2);border:1px solid var(--gris3);border-radius:8px;padding:8px;color:white;font-family:var(--font-body)">
+            <option value="">Todos los estados</option>
+            <option value="disponible">Disponible</option>
+            <option value="asignada">Asignada</option>
+            <option value="vendida">Vendida</option>
+          </select>
+        </div>
+        <div id="listaVerStock" style="max-height:300px;overflow-y:auto"></div>
+        <p id="verStockTotal" style="font-size:12px;color:#aaa;margin-top:8px;text-align:right"></p>
+      </div>
     </div>
     <button class="btn btn-gris" onclick="logout()" style="margin-top:8px">CERRAR SESIÓN</button>
   </div>
@@ -1993,22 +2040,121 @@ async function cargarHistorico() {
 }
 
 // ===== PULSERAS =====
-async function cargarStockPulseras() {
+let tesseractCargado = false;
+
+async function cargarTesseract() {
+  if (tesseractCargado || window.Tesseract) { tesseractCargado = true; return; }
+  return new Promise((res, rej) => {
+    const sc = document.createElement('script');
+    sc.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    sc.onload = () => { tesseractCargado = true; res(); };
+    sc.onerror = rej;
+    document.head.appendChild(sc);
+  });
+}
+
+function pulseraTab(tab, btn) {
+  ['Cargar','Asignar','Ver'].forEach(t => {
+    const el = document.getElementById('pt'+t);
+    if (el) el.style.display = 'none';
+    const b = document.getElementById('ptb'+t);
+    if (b) { b.style.borderBottom = '2px solid transparent'; b.style.color = '#666'; b.style.fontWeight = 'normal'; }
+  });
+  document.getElementById('pt'+tab).style.display = 'block';
+  btn.style.borderBottom = '2px solid var(--rojo)';
+  btn.style.color = 'white';
+  btn.style.fontWeight = '600';
+  if (tab === 'Ver') cargarVerStock();
+  if (tab === 'Asignar') cargarResumenPulseras();
+}
+
+let ocrAdminFotoBase64 = null;
+
+async function procesarOcrAdmin(input) {
+  const file = input.files[0]; if (!file) return;
+  const zona = document.getElementById('ocrZonaAdmin');
+  zona.style.borderColor = '#f0a800';
+  document.getElementById('ocrAdminMsg').textContent = '⏳ Cargando lector…';
+  await cargarTesseract();
+  const reader = new FileReader();
+  reader.onload = async e => {
+    ocrAdminFotoBase64 = e.target.result;
+    document.getElementById('ocrAdminFoto').src = ocrAdminFotoBase64;
+    document.getElementById('ocrAdminMsg').textContent = '🔍 Leyendo número…';
+    try {
+      const result = await Tesseract.recognize(ocrAdminFotoBase64, 'eng', {
+        tessedit_char_whitelist: '0123456789',
+        tessedit_pageseg_mode: '6'
+      });
+      const num = result.data.text.replace(/[^0-9]/g,'').trim();
+      document.getElementById('ocrAdminNumero').value = num;
+      zona.style.borderColor = '#4caf50';
+      document.getElementById('ocrAdminMsg').textContent = '✓ Número detectado';
+    } catch(err) {
+      zona.style.borderColor = '#555';
+      document.getElementById('ocrAdminMsg').textContent = 'No se pudo leer — ingresa el número manualmente';
+      document.getElementById('ocrAdminNumero').value = '';
+    }
+    document.getElementById('ocrAdminResultado').style.display = 'block';
+    zona.style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+function resetOcrAdmin() {
+  ocrAdminFotoBase64 = null;
+  document.getElementById('ocrGaleria').value = '';
+  document.getElementById('ocrCamara').value = '';
+  document.getElementById('ocrAdminResultado').style.display = 'none';
+  const zona = document.getElementById('ocrZonaAdmin');
+  zona.style.display = 'block';
+  zona.style.borderColor = '#555';
+  document.getElementById('ocrAdminMsg').textContent = '📷 Saca foto a la pulsera para leer el número';
+  document.getElementById('ocrAdminNumero').value = '';
+}
+
+async function agregarPulseraStock() {
   if (!eventoActivo) { alert('No hay evento activo.'); return; }
-  const tipo = document.getElementById('pulseraTipo').value;
-  const cantidad = parseInt(document.getElementById('pulseraStock').value) || 0;
-  if (!cantidad) return;
-  const { data: ex } = await db.from('pulseras_stock').select('*').eq('evento_id', eventoActivo.id).eq('tipo', tipo);
-  if (ex && ex.length > 0) {
-    await db.from('pulseras_stock').update({ total: ex[0].total + cantidad }).eq('id', ex[0].id);
-  } else {
-    await db.from('pulseras_stock').insert({ evento_id: eventoActivo.id, tipo, total: cantidad });
+  const numero = document.getElementById('ocrAdminNumero').value.trim();
+  const tipo = document.getElementById('cargaTipo').value;
+  if (!numero) { alert('El número de pulsera no puede estar vacío.'); return; }
+  // Verificar duplicado
+  const { data: existe } = await db.from('pulseras').select('id').eq('evento_id', eventoActivo.id).eq('numero', numero);
+  if (existe && existe.length > 0) {
+    document.getElementById('ocrAdminMsg2').textContent = '⚠️ El número ' + numero + ' ya está en el stock.';
+    document.getElementById('ocrAdminMsg2').style.color = '#e8001d';
+    document.getElementById('ocrAdminMsg2').style.display = 'block';
+    setTimeout(() => document.getElementById('ocrAdminMsg2').style.display = 'none', 2500);
+    return;
   }
-  const m = document.getElementById('pulseraMsg');
-  m.textContent = '✓ Stock cargado: ' + cantidad + ' pulseras ' + tipo; m.style.display = 'block';
-  setTimeout(() => m.style.display = 'none', 2500);
-  document.getElementById('pulseraStock').value = '';
-  cargarResumenPulseras();
+  const { error } = await db.from('pulseras').insert({
+    numero, tipo, evento_id: eventoActivo.id,
+    estado: 'disponible', foto_url: ocrAdminFotoBase64
+  });
+  if (error) { alert('Error: ' + error.message); return; }
+  document.getElementById('ocrAdminMsg2').textContent = '✅ Pulsera #' + numero + ' agregada al stock.';
+  document.getElementById('ocrAdminMsg2').style.color = '#4caf50';
+  document.getElementById('ocrAdminMsg2').style.display = 'block';
+  setTimeout(() => document.getElementById('ocrAdminMsg2').style.display = 'none', 2000);
+  resetOcrAdmin();
+  cargarListaCargadas();
+}
+
+async function cargarListaCargadas() {
+  if (!eventoActivo) return;
+  const tipo = document.getElementById('cargaTipo').value;
+  const { data } = await db.from('pulseras').select('*').eq('evento_id', eventoActivo.id).eq('tipo', tipo).order('created_at', { ascending: false }).limit(20);
+  const cont = document.getElementById('listaCargadas');
+  if (!data || data.length === 0) { cont.innerHTML = '<p style="font-size:12px;color:#555;text-align:center;padding:8px">Sin pulseras cargadas aún</p>'; return; }
+  const total = data.length;
+  cont.innerHTML = `<p style="font-size:11px;color:#aaa;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">${total} pulseras cargadas</p>` +
+    data.map(p => `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #2a2a2a;font-size:12px">
+      <div style="display:flex;align-items:center;gap:8px">
+        ${p.foto_url ? `<img src="${p.foto_url}" style="width:24px;height:24px;object-fit:cover;border-radius:4px">` : '<div style="width:24px;height:24px;background:#2a2a2a;border-radius:4px"></div>'}
+        <span style="font-weight:700;color:#f0a800;letter-spacing:2px">#${p.numero}</span>
+      </div>
+      <span style="padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;background:${p.estado==='disponible'?'#0d1f0d':p.estado==='asignada'?'#0a0d1f':'#1a0505'};color:${p.estado==='disponible'?'#4caf50':p.estado==='asignada'?'#4a90d9':'#e8001d'}">${p.estado}</span>
+    </div>`).join('');
 }
 
 async function asignarLotePulseras() {
@@ -2018,51 +2164,96 @@ async function asignarLotePulseras() {
   const tipo = document.getElementById('loteTipo').value;
   const cantidad = parseInt(document.getElementById('loteCantidad').value) || 0;
   if (!vendedoraId || !cantidad) return;
+  // Obtener las próximas N pulseras disponibles de ese tipo
+  const { data: disponibles } = await db.from('pulseras').select('id,numero').eq('evento_id', eventoActivo.id).eq('tipo', tipo).eq('estado', 'disponible').order('created_at').limit(cantidad);
+  if (!disponibles || disponibles.length === 0) { alert('No hay pulseras disponibles de tipo ' + tipo + '.'); return; }
+  if (disponibles.length < cantidad) { alert('Solo hay ' + disponibles.length + ' pulseras disponibles. ¿Asignar ' + disponibles.length + '?'); }
+  const ids = disponibles.map(p => p.id);
+  await db.from('pulseras').update({ vendedor_id: vendedoraId, vendedor_nombre: vendedoraNombre, estado: 'asignada' }).in('id', ids);
+  // Actualizar lote
   const { data: ex } = await db.from('pulseras_lotes').select('*').eq('evento_id', eventoActivo.id).eq('vendedor_id', vendedoraId).eq('tipo', tipo);
   if (ex && ex.length > 0) {
-    await db.from('pulseras_lotes').update({ total: ex[0].total + cantidad }).eq('id', ex[0].id);
+    await db.from('pulseras_lotes').update({ total: ex[0].total + disponibles.length }).eq('id', ex[0].id);
   } else {
-    await db.from('pulseras_lotes').insert({ evento_id: eventoActivo.id, vendedor_id: vendedoraId, vendedor_nombre: vendedoraNombre, tipo, total: cantidad, vendidas: 0 });
+    await db.from('pulseras_lotes').insert({ evento_id: eventoActivo.id, vendedor_id: vendedoraId, vendedor_nombre: vendedoraNombre, tipo, total: disponibles.length, vendidas: 0 });
   }
   const m = document.getElementById('pulseraMsg');
-  m.textContent = '✓ Lote asignado: ' + cantidad + ' ' + tipo + ' → ' + vendedoraNombre; m.style.display = 'block';
-  setTimeout(() => m.style.display = 'none', 2500);
+  m.textContent = '✅ ' + disponibles.length + ' pulseras ' + tipo + ' asignadas a ' + vendedoraNombre;
+  m.style.display = 'block';
+  setTimeout(() => m.style.display = 'none', 3000);
   document.getElementById('loteCantidad').value = '';
   cargarResumenPulseras();
 }
 
+async function cargarVerStock() {
+  if (!eventoActivo) return;
+  let query = db.from('pulseras').select('*').eq('evento_id', eventoActivo.id).order('tipo').order('estado').order('numero');
+  const tipo = document.getElementById('verTipo')?.value;
+  const estado = document.getElementById('verEstado')?.value;
+  if (tipo) query = query.eq('tipo', tipo);
+  if (estado) query = query.eq('estado', estado);
+  const { data } = await query;
+  const cont = document.getElementById('listaVerStock');
+  const total = document.getElementById('verStockTotal');
+  if (!data || data.length === 0) { cont.innerHTML = '<p style="font-size:12px;color:#555;text-align:center;padding:12px">Sin pulseras</p>'; if(total) total.textContent=''; return; }
+  if (total) total.textContent = data.length + ' pulseras';
+  cont.innerHTML = data.map(p => `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-bottom:1px solid #2a2a2a;font-size:12px">
+    <div>
+      <span style="font-weight:700;color:#f0a800;letter-spacing:2px;margin-right:8px">#${p.numero}</span>
+      <span style="font-size:10px;color:#888">${p.tipo === 'general' ? '🟢' : '🔵'} ${p.vendedor_nombre || '—'}</span>
+    </div>
+    <span style="padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;background:${p.estado==='disponible'?'#0d1f0d':p.estado==='asignada'?'#0a0d1f':'#1a0505'};color:${p.estado==='disponible'?'#4caf50':p.estado==='asignada'?'#4a90d9':'#e8001d'}">${p.estado}</span>
+  </div>`).join('');
+}
+
 async function cargarResumenPulseras() {
   if (!eventoActivo) return;
-  const { data: stock } = await db.from('pulseras_stock').select('*').eq('evento_id', eventoActivo.id);
+  const { data: stock } = await db.from('pulseras').select('tipo,estado').eq('evento_id', eventoActivo.id);
   const { data: lotes } = await db.from('pulseras_lotes').select('*').eq('evento_id', eventoActivo.id);
   const cont = document.getElementById('resumenPulseras');
   if (!cont) return;
   let html = '';
   if (stock && stock.length > 0) {
-    html += '<p style="font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Stock total</p>';
-    stock.forEach(s => {
-      html += `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #2a2a2a;font-size:13px">
-        <span style="color:#aaa">${s.tipo === 'general' ? '🟢 General' : '🔵 Parque Cerrado'}</span>
-        <span style="color:#f0a800;font-weight:700">${s.total} pulseras</span></div>`;
-    });
+    const dispGen = stock.filter(p=>p.tipo==='general'&&p.estado==='disponible').length;
+    const dispPC = stock.filter(p=>p.tipo==='parque_cerrado'&&p.estado==='disponible').length;
+    const totGen = stock.filter(p=>p.tipo==='general').length;
+    const totPC = stock.filter(p=>p.tipo==='parque_cerrado').length;
+    html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div style="background:#0d1f0d;border:1px solid #4caf50;border-radius:8px;padding:10px;text-align:center">
+        <p style="font-size:10px;color:#4caf50;margin-bottom:2px">🟢 GENERAL</p>
+        <p style="font-size:18px;font-weight:800;color:#4caf50">${dispGen} disp.</p>
+        <p style="font-size:10px;color:#555">${totGen} total</p>
+      </div>
+      <div style="background:#0a0d1f;border:1px solid #4a90d9;border-radius:8px;padding:10px;text-align:center">
+        <p style="font-size:10px;color:#4a90d9;margin-bottom:2px">🔵 PARQUE CERRADO</p>
+        <p style="font-size:18px;font-weight:800;color:#4a90d9">${dispPC} disp.</p>
+        <p style="font-size:10px;color:#555">${totPC} total</p>
+      </div>
+    </div>`;
   }
   if (lotes && lotes.length > 0) {
-    html += '<p style="font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:.5px;margin:10px 0 6px">Lotes por vendedora</p>';
+    html += '<p style="font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Lotes asignados</p>';
     lotes.forEach(l => {
       const disp = l.total - l.vendidas;
       html += `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #2a2a2a;font-size:13px">
-        <span>${l.vendedor_nombre} · <span style="color:#aaa">${l.tipo === 'general' ? 'General' : 'Parque Cerrado'}</span></span>
+        <span>${l.vendedor_nombre} · <span style="color:#aaa">${l.tipo==='general'?'General':'Parque Cerrado'}</span></span>
         <span><span style="color:#4caf50">${disp} disp.</span> <span style="color:#555">${l.vendidas}/${l.total}</span></span></div>`;
     });
   }
-  cont.innerHTML = html || '<p style="font-size:12px;color:#555">Sin pulseras cargadas.</p>';
+  cont.innerHTML = html || '<p style="font-size:12px;color:#555">Sin pulseras asignadas aún.</p>';
 }
 
 async function descontarPulsera(vendedorId, tipoEntrada) {
   if (!eventoActivo) return;
-  const tipo = tipoEntrada.toLowerCase().includes('parque') ? 'parque_cerrado' : 
+  const tipo = tipoEntrada.toLowerCase().includes('parque') ? 'parque_cerrado' :
                tipoEntrada.toLowerCase().includes('general') ? 'general' : null;
   if (!tipo) return;
+  // Marcar la próxima pulsera asignada como vendida
+  const { data: siguiente } = await db.from('pulseras').select('id').eq('evento_id', eventoActivo.id).eq('vendedor_id', vendedorId).eq('tipo', tipo).eq('estado', 'asignada').order('created_at').limit(1);
+  if (siguiente && siguiente.length > 0) {
+    await db.from('pulseras').update({ estado: 'vendida' }).eq('id', siguiente[0].id);
+  }
+  // Actualizar contador en lote
   const { data: lote } = await db.from('pulseras_lotes').select('*').eq('evento_id', eventoActivo.id).eq('vendedor_id', vendedorId).eq('tipo', tipo);
   if (lote && lote.length > 0) {
     await db.from('pulseras_lotes').update({ vendidas: lote[0].vendidas + 1 }).eq('id', lote[0].id);
@@ -2074,7 +2265,6 @@ async function cargarSelectVendedoras() {
   const sel = document.getElementById('loteVendedora');
   if (sel && data) sel.innerHTML = data.map(v => `<option value="${v.id}">${v.nombre}</option>`).join('');
 }
-
 // ===== DASHBOARD =====
 let dashInterval = null;
 let dashMoneda = 'CLP';
