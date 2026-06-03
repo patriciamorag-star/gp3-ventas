@@ -1189,13 +1189,15 @@ function selTipoIdx(idx) {
   const esTicketera = tipo && nombre.includes('ticketera');
   const esInvitado = nombre.includes('invitado');
   const esTerceraOMenor = nombre.includes('tercera') || nombre.includes('menor');
-  const esGratuito = esTicketera || esInvitado || esTerceraOMenor;
-  const necesitaCategoria = esInvitado || esTerceraOMenor;
+  const esDiaAnterior = nombre.includes('anterior');
+  const esGratuito = esTicketera || esInvitado || esTerceraOMenor || esDiaAnterior;
+  const necesitaCategoria = esInvitado || esTerceraOMenor || esDiaAnterior;
   const pagoSection = document.getElementById('pagoSection');
   if (pagoSection) pagoSection.style.display = esGratuito ? 'none' : 'block';
   if (esTicketera) pagoSeleccionado = 'ticketera';
-  if (esInvitado) pagoSeleccionado = 'gratuito';
+  if (esInvitado) pagoSeleccionado = 'invitado';
   if (esTerceraOMenor) pagoSeleccionado = 'gratuito';
+  if (nombre.includes('anterior')) pagoSeleccionado = 'reingreso';
   // Categoría pulsera — invitado, tercera edad y menor eligen categoría
   const catSection = document.getElementById('categoriaPulseraSection');
   if (catSection) catSection.style.display = necesitaCategoria ? 'block' : 'none';
@@ -1256,6 +1258,8 @@ function getTipos() {
     { nombre: 'Invitado Parque Cerrado', precio: 0 },
     { nombre: 'Tercera Edad/Menor General', precio: 0 },
     { nombre: 'Tercera Edad/Menor Parque Cerrado', precio: 0 },
+    { nombre: 'Entrada Día Anterior General', precio: 0 },
+    { nombre: 'Entrada Día Anterior Parque Cerrado', precio: 0 },
   ];
   try {
     if (!eventoActivo.tipos_entrada) return tiposDefault;
@@ -1338,7 +1342,8 @@ async function registrarVenta() {
   const nombreTipo = tipoObj.nombre.toLowerCase();
   const esTerceraOMenorV = nombreTipo.includes('tercera') || nombreTipo.includes('menor');
   const esInvitadoV = nombreTipo.includes('invitado');
-  const necesitaCatV = esTerceraOMenorV || esInvitadoV;
+  const esDiaAnteriorV = nombreTipo.includes('anterior');
+  const necesitaCatV = esTerceraOMenorV || esInvitadoV || esDiaAnteriorV;
   if (necesitaCatV && !categoriaPulseraSeleccionada) {
     showErr('ventaError', 'Selecciona la categoría de pulsera (General o Parque Cerrado).');
     btn.disabled = false; btn.innerHTML = 'REGISTRAR VENTA'; return;
@@ -1354,8 +1359,15 @@ async function registrarVenta() {
     else if (nombreTipo.includes('parque') || esInvitadoV) catPulsera = 'parque_cerrado';
     else if (nombreTipo.includes('vip')) catPulsera = 'vip';
   }
-  const medioFinal = esTicketera ? 'ticketera' : esInvitadoV ? 'gratuito' : pagoSeleccionado;
-  const estadoFinal = (esTicketera || esInvitadoV) ? 'confirmada' : pagoSeleccionado === 'transferencia' ? 'pendiente' : 'confirmada';
+  // Determinar medio_pago correcto según tipo
+  let medioFinal;
+  if (esTicketera) medioFinal = 'ticketera';
+  else if (esInvitadoV) medioFinal = 'invitado';
+  else if (esTerceraOMenorV) medioFinal = 'gratuito';
+  else if (nombreTipo.includes('anterior')) medioFinal = 'reingreso';
+  else medioFinal = pagoSeleccionado;
+  const esGratuitoV = esTicketera || esInvitadoV || esTerceraOMenorV || nombreTipo.includes('anterior');
+  const estadoFinal = esGratuitoV ? 'confirmada' : pagoSeleccionado === 'transferencia' ? 'pendiente' : 'confirmada';
   const { error } = await db.from('ventas').insert({
     evento_id: eventoActivo.id,
     vendedor_id: usuario.id,
@@ -1376,7 +1388,7 @@ async function registrarVenta() {
   btn.innerHTML = 'REGISTRAR VENTA';
 
   if (!error) {
-    await descontarPulsera(usuario.id, tipoObj.nombre, catPulsera);
+    if (!tipoObj.nombre.toLowerCase().includes('anterior')) await descontarPulsera(usuario.id, tipoObj.nombre, catPulsera);
   }
 
   if (error) {
@@ -1832,6 +1844,8 @@ function abrirModalEvento() {
       {nombre:'Invitado Parque Cerrado', precio:'0'},
       {nombre:'Tercera Edad/Menor General', precio:'0'},
       {nombre:'Tercera Edad/Menor Parque Cerrado', precio:'0'},
+      {nombre:'Entrada Día Anterior General', precio:'0'},
+      {nombre:'Entrada Día Anterior Parque Cerrado', precio:'0'},
     ];
     cont.innerHTML = tipos.map(t => `
       <div class="tipo-input-row" style="display:flex;gap:8px;margin-bottom:8px">
@@ -2389,7 +2403,7 @@ async function cargarResumenStock(){
   await cargarResumenAsignacion();
   document.getElementById('resumenStock').innerHTML=document.getElementById('resumenAsignacion').innerHTML;
   // Detalle
-  const {data}=await dbP.from('pulseras').select('numero,tipo,estado').eq('evento_id',ev.id).order('numero');
+  const {data}=await dbP.from('pulseras').select('id,numero,tipo,estado,vendedor_nombre').eq('evento_id',ev.id).order('numero');
   const det=document.getElementById('detalleStock');
   if(!data||data.length===0){det.innerHTML='';return;}
   const colores={sin_asignar:'#555',general:'#4caf50',parque_cerrado:'#4a90d9',vip:'#f0a800'};
