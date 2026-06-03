@@ -660,7 +660,7 @@
       <!-- Foto comprobante transferencia -->
       <div id="fotoComprobanteSection" style="display:none;margin-top:10px;margin-bottom:4px">
         <div style="border:1.5px dashed #444;border-radius:10px;padding:14px;background:#1a1a1a;text-align:center" id="fotoCompZona">
-          <p style="font-size:12px;color:#888;margin-bottom:10px">📎 Foto del comprobante (opcional)</p>
+          <p style="font-size:12px;color:#e8001d;margin-bottom:10px;font-weight:600">📎 Foto del comprobante <span style="color:#e8001d">* obligatoria</span></p>
           <div style="display:flex;gap:8px;justify-content:center">
             <button class="btn btn-gris btn-sm" onclick="document.getElementById('fotoCompGal').click()">🖼 Galería</button>
             <button class="btn btn-gris btn-sm" onclick="document.getElementById('fotoCompCam').click()">📷 Cámara</button>
@@ -1319,6 +1319,10 @@ async function registrarVenta() {
   const necesitaCatV = esTerceraOMenorV || esInvitadoV;
   if (necesitaCatV && !categoriaPulseraSeleccionada) {
     showErr('ventaError', 'Selecciona la categoría de pulsera (General o Parque Cerrado).');
+    btn.disabled = false; btn.innerHTML = 'REGISTRAR VENTA'; return;
+  }
+  if (pagoSeleccionado === 'transferencia' && !fotoComprobanteBase64) {
+    showErr('ventaError', 'La foto del comprobante es obligatoria para transferencias.');
     btn.disabled = false; btn.innerHTML = 'REGISTRAR VENTA'; return;
   }
   // Determinar categoría pulsera
@@ -2150,7 +2154,8 @@ function pulseraTab(tab, btn) {
 }
 
 async function getEventoActivo() {
-  if(eventoActivo) return eventoActivo;
+  // Si eventoActivo existe pero no tiene id válido, re-consultar
+  if(eventoActivo && eventoActivo.id) return eventoActivo;
   const {data} = await db.from('neu_eventos').select('*').eq('activo',true).order('fecha',{ascending:false}).limit(1);
   if(data&&data.length>0){eventoActivo=data[0]; return eventoActivo;}
   return null;
@@ -2169,7 +2174,7 @@ function actualizarPreviewRango() {
 
 async function cargarRango() {
   const ev = await getEventoActivo();
-  if(!ev){alert('No hay evento activo.');return;}
+  if(!ev||!ev.id){alert('No hay evento activo o el evento no tiene ID válido. Verifica en Admin → Eventos.');return;}
   const inicio=document.getElementById('rangoInicio').value.trim();
   const fin=document.getElementById('rangoFin').value.trim();
   if(!inicio||!fin){alert('Ingresa número inicial y final.');return;}
