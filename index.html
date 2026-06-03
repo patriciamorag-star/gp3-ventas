@@ -736,7 +736,7 @@
             <option value="parque_cerrado">🔵 Parque Cerrado</option>
           </select>
         </div>
-        <div id="ocrZonaAdmin" style="border:2px dashed #555;border-radius:10px;padding:16px;text-align:center;background:#1a1a1a;margin-bottom:10px">
+        <div id="ocrZonaAdmin" style="border:2px dashed #555;border-radius:10px;padding:16px;text-align:center;background:#1a1a1a;margin-bottom:10px;display:block">
           <p style="font-size:13px;color:#777;margin-bottom:10px" id="ocrAdminMsg">📷 Saca foto a la pulsera para leer el número</p>
           <div style="display:flex;gap:8px;justify-content:center">
             <button class="btn btn-gris btn-sm" onclick="document.getElementById('ocrGaleria').click()">🖼 Galería</button>
@@ -878,6 +878,7 @@ const SUPABASE_URL = 'https://bupwpvmfkdggdlmvmvwl.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_3pcQ24iAyT6Vyi2cuj9rWQ_90FycYR9';
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+const dbP = createClient('https://mkxyebjawntryyikrjso.supabase.co','sb_publishable_j0XNWovYgPeCQhLPHe7-Lw_pRZiLxjC');
 
 // ===== ESTADO =====
 let usuario = null;
@@ -1071,6 +1072,7 @@ function showTab(tab) {
 
   if (tab === 'ventas') cargarVentas();
   if (tab === 'cierre') cargarCierre();
+  if (tab === 'admin') cargarPulserasAdmin();
   if (tab === 'admin') { cargarEventosAdmin(); cargarTransfPendientes(); cargarMediosPagoAdmin(); }
   if (tab === 'consolidado') { cargarEventosSelector(); cargarConsolidado(); }
   if (tab === 'historico') cargarHistorico();
@@ -2103,23 +2105,26 @@ async function procesarOcrAdmin(input) {
 
 function resetOcrAdmin() {
   ocrAdminFotoBase64 = null;
-  document.getElementById('ocrGaleria').value = '';
-  document.getElementById('ocrCamara').value = '';
-  document.getElementById('ocrAdminResultado').style.display = 'none';
+  const gal = document.getElementById('ocrGaleria'); if(gal) gal.value = '';
+  const cam = document.getElementById('ocrCamara'); if(cam) cam.value = '';
+  const res = document.getElementById('ocrAdminResultado'); if(res) res.style.display = 'none';
   const zona = document.getElementById('ocrZonaAdmin');
-  zona.style.display = 'block';
-  zona.style.borderColor = '#555';
-  document.getElementById('ocrAdminMsg').textContent = '📷 Saca foto a la pulsera para leer el número';
-  document.getElementById('ocrAdminNumero').value = '';
+  if(zona){ zona.style.display = 'block'; zona.style.borderColor = '#555'; }
+  const msg = document.getElementById('ocrAdminMsg'); if(msg) msg.textContent = '📷 Saca foto a la pulsera para leer el número';
+  const num = document.getElementById('ocrAdminNumero'); if(num) num.value = '';
 }
 
 async function agregarPulseraStock() {
-  if (!eventoActivo) { alert('No hay evento activo.'); return; }
+  if (!eventoActivo) {
+    const { data: evs } = await db.from('neu_eventos').select('*').eq('activo', true).order('fecha', { ascending: false }).limit(1);
+    if (evs && evs.length > 0) eventoActivo = evs[0];
+  }
+  if (!eventoActivo) { alert('No hay evento activo. Crea o activa un evento primero.'); return; }
   const numero = document.getElementById('ocrAdminNumero').value.trim();
   const tipo = document.getElementById('cargaTipo').value;
   if (!numero) { alert('El número de pulsera no puede estar vacío.'); return; }
   // Verificar duplicado
-  const { data: existe } = await db.from('pulseras').select('id').eq('evento_id', eventoActivo.id).eq('numero', numero);
+  const { data: existe } = await dbP.from('pulseras').select('id').eq('evento_id', eventoActivo.id).eq('numero', numero);
   if (existe && existe.length > 0) {
     document.getElementById('ocrAdminMsg2').textContent = '⚠️ El número ' + numero + ' ya está en el stock.';
     document.getElementById('ocrAdminMsg2').style.color = '#e8001d';
@@ -2127,9 +2132,9 @@ async function agregarPulseraStock() {
     setTimeout(() => document.getElementById('ocrAdminMsg2').style.display = 'none', 2500);
     return;
   }
-  const { error } = await db.from('pulseras').insert({
+  const { error } = await dbP.from('pulseras').insert({
     numero, tipo, evento_id: eventoActivo.id,
-    estado: 'disponible', foto_url: ocrAdminFotoBase64
+    estado: 'disponible'
   });
   if (error) { alert('Error: ' + error.message); return; }
   document.getElementById('ocrAdminMsg2').textContent = '✅ Pulsera #' + numero + ' agregada al stock.';
@@ -2143,7 +2148,7 @@ async function agregarPulseraStock() {
 async function cargarListaCargadas() {
   if (!eventoActivo) return;
   const tipo = document.getElementById('cargaTipo').value;
-  const { data } = await db.from('pulseras').select('*').eq('evento_id', eventoActivo.id).eq('tipo', tipo).order('created_at', { ascending: false }).limit(20);
+  const { data } = await dbP.from('pulseras').select('*').eq('evento_id', eventoActivo.id).eq('tipo', tipo).order('created_at', { ascending: false }).limit(20);
   const cont = document.getElementById('listaCargadas');
   if (!data || data.length === 0) { cont.innerHTML = '<p style="font-size:12px;color:#555;text-align:center;padding:8px">Sin pulseras cargadas aún</p>'; return; }
   const total = data.length;
@@ -2158,24 +2163,28 @@ async function cargarListaCargadas() {
 }
 
 async function asignarLotePulseras() {
-  if (!eventoActivo) { alert('No hay evento activo.'); return; }
+  if (!eventoActivo) {
+    const { data: evs } = await db.from('neu_eventos').select('*').eq('activo', true).order('fecha', { ascending: false }).limit(1);
+    if (evs && evs.length > 0) eventoActivo = evs[0];
+  }
+  if (!eventoActivo) { alert('No hay evento activo. Crea o activa un evento primero.'); return; }
   const vendedoraId = document.getElementById('loteVendedora').value;
   const vendedoraNombre = document.getElementById('loteVendedora').options[document.getElementById('loteVendedora').selectedIndex]?.text || '';
   const tipo = document.getElementById('loteTipo').value;
   const cantidad = parseInt(document.getElementById('loteCantidad').value) || 0;
   if (!vendedoraId || !cantidad) return;
   // Obtener las próximas N pulseras disponibles de ese tipo
-  const { data: disponibles } = await db.from('pulseras').select('id,numero').eq('evento_id', eventoActivo.id).eq('tipo', tipo).eq('estado', 'disponible').order('created_at').limit(cantidad);
+  const { data: disponibles } = await dbP.from('pulseras').select('id,numero').eq('evento_id', eventoActivo.id).eq('tipo', tipo).eq('estado', 'disponible').order('created_at').limit(cantidad);
   if (!disponibles || disponibles.length === 0) { alert('No hay pulseras disponibles de tipo ' + tipo + '.'); return; }
   if (disponibles.length < cantidad) { alert('Solo hay ' + disponibles.length + ' pulseras disponibles. ¿Asignar ' + disponibles.length + '?'); }
   const ids = disponibles.map(p => p.id);
-  await db.from('pulseras').update({ vendedor_id: vendedoraId, vendedor_nombre: vendedoraNombre, estado: 'asignada' }).in('id', ids);
+  await dbP.from('pulseras').update({ vendedor_id: vendedoraId, vendedor_nombre: vendedoraNombre, estado: 'asignada' }).in('id', ids);
   // Actualizar lote
-  const { data: ex } = await db.from('pulseras_lotes').select('*').eq('evento_id', eventoActivo.id).eq('vendedor_id', vendedoraId).eq('tipo', tipo);
+  const { data: ex } = await dbP.from('pulseras_lotes').select('*').eq('evento_id', eventoActivo.id).eq('vendedor_id', vendedoraId).eq('tipo', tipo);
   if (ex && ex.length > 0) {
-    await db.from('pulseras_lotes').update({ total: ex[0].total + disponibles.length }).eq('id', ex[0].id);
+    await dbP.from('pulseras_lotes').update({ total: ex[0].total + disponibles.length }).eq('id', ex[0].id);
   } else {
-    await db.from('pulseras_lotes').insert({ evento_id: eventoActivo.id, vendedor_id: vendedoraId, vendedor_nombre: vendedoraNombre, tipo, total: disponibles.length, vendidas: 0 });
+    await dbP.from('pulseras_lotes').insert({ evento_id: eventoActivo.id, vendedor_id: vendedoraId, vendedor_nombre: vendedoraNombre, tipo, total: disponibles.length, vendidas: 0 });
   }
   const m = document.getElementById('pulseraMsg');
   m.textContent = '✅ ' + disponibles.length + ' pulseras ' + tipo + ' asignadas a ' + vendedoraNombre;
@@ -2187,7 +2196,7 @@ async function asignarLotePulseras() {
 
 async function cargarVerStock() {
   if (!eventoActivo) return;
-  let query = db.from('pulseras').select('*').eq('evento_id', eventoActivo.id).order('tipo').order('estado').order('numero');
+  let query = dbP.from('pulseras').select('*').eq('evento_id', eventoActivo.id).order('tipo').order('estado').order('numero');
   const tipo = document.getElementById('verTipo')?.value;
   const estado = document.getElementById('verEstado')?.value;
   if (tipo) query = query.eq('tipo', tipo);
@@ -2208,8 +2217,8 @@ async function cargarVerStock() {
 
 async function cargarResumenPulseras() {
   if (!eventoActivo) return;
-  const { data: stock } = await db.from('pulseras').select('tipo,estado').eq('evento_id', eventoActivo.id);
-  const { data: lotes } = await db.from('pulseras_lotes').select('*').eq('evento_id', eventoActivo.id);
+  const { data: stock } = await dbP.from('pulseras').select('tipo,estado').eq('evento_id', eventoActivo.id);
+  const { data: lotes } = await dbP.from('pulseras_lotes').select('*').eq('evento_id', eventoActivo.id);
   const cont = document.getElementById('resumenPulseras');
   if (!cont) return;
   let html = '';
@@ -2249,15 +2258,27 @@ async function descontarPulsera(vendedorId, tipoEntrada) {
                tipoEntrada.toLowerCase().includes('general') ? 'general' : null;
   if (!tipo) return;
   // Marcar la próxima pulsera asignada como vendida
-  const { data: siguiente } = await db.from('pulseras').select('id').eq('evento_id', eventoActivo.id).eq('vendedor_id', vendedorId).eq('tipo', tipo).eq('estado', 'asignada').order('created_at').limit(1);
+  const { data: siguiente } = await dbP.from('pulseras').select('id').eq('evento_id', eventoActivo.id).eq('vendedor_id', vendedorId).eq('tipo', tipo).eq('estado', 'asignada').order('created_at').limit(1);
   if (siguiente && siguiente.length > 0) {
-    await db.from('pulseras').update({ estado: 'vendida' }).eq('id', siguiente[0].id);
+    await dbP.from('pulseras').update({ estado: 'vendida' }).eq('id', siguiente[0].id);
   }
   // Actualizar contador en lote
-  const { data: lote } = await db.from('pulseras_lotes').select('*').eq('evento_id', eventoActivo.id).eq('vendedor_id', vendedorId).eq('tipo', tipo);
+  const { data: lote } = await dbP.from('pulseras_lotes').select('*').eq('evento_id', eventoActivo.id).eq('vendedor_id', vendedorId).eq('tipo', tipo);
   if (lote && lote.length > 0) {
-    await db.from('pulseras_lotes').update({ vendidas: lote[0].vendidas + 1 }).eq('id', lote[0].id);
+    await dbP.from('pulseras_lotes').update({ vendidas: lote[0].vendidas + 1 }).eq('id', lote[0].id);
   }
+}
+
+async function cargarPulserasAdmin() {
+  // Cargar eventoActivo para admin si no está seteado
+  if (!eventoActivo) {
+    const { data: evs } = await db.from('neu_eventos').select('*').eq('activo', true).order('fecha', { ascending: false }).limit(1);
+    if (evs && evs.length > 0) eventoActivo = evs[0];
+  }
+  await cargarSelectVendedoras();
+  await cargarResumenPulseras();
+  // Resetear OCR por si acaso
+  resetOcrAdmin();
 }
 
 async function cargarSelectVendedoras() {
@@ -2307,7 +2328,7 @@ async function cargarDashboard() {
     document.getElementById('dPendientes').innerHTML = '<div style="color:#555;font-size:13px;padding:8px 0">Sin transferencias pendientes ✅</div>';
     // Pulseras incluso sin ventas
     if (eventoActivo) {
-      const { data: pLotes0 } = await db.from('pulseras_lotes').select('*').eq('evento_id', eventoActivo.id);
+      const { data: pLotes0 } = await dbP.from('pulseras_lotes').select('*').eq('evento_id', eventoActivo.id);
       const dP = document.getElementById('dPulseras');
       if (dP && pLotes0 && pLotes0.length > 0) {
         const gen0=pLotes0.filter(l=>l.tipo==='general'), pc0=pLotes0.filter(l=>l.tipo==='parque_cerrado');
