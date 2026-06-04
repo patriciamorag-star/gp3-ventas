@@ -476,6 +476,8 @@
     padding: 24px 20px;
     width: 100%;
     max-width: 600px;
+    max-height: 85vh;
+    overflow-y: auto;
     border-top: 2px solid var(--rojo);
   }
   .modal h3 {
@@ -1275,12 +1277,20 @@ function selTipoIdx(idx) {
 function selPago(pago) {
   pagoSeleccionado = pago;
   document.querySelectorAll('.pago-btn').forEach(b => b.classList.remove('selected'));
-  document.querySelectorAll('.pago-btn').forEach(b => {
-    if (b.dataset.pago === pago) b.classList.add('selected');
-  });
+  document.querySelectorAll('.pago-btn').forEach(b => { if (b.dataset.pago === pago) b.classList.add('selected'); });
   const fotoSection = document.getElementById('fotoComprobanteSection');
-  if (fotoSection) fotoSection.style.display = pago === 'transferencia' ? 'block' : 'none';
-  if (pago !== 'transferencia') { fotoComprobanteBase64 = null; }
+  if (pago === 'transferencia') {
+    fotoSection.style.display = 'block';
+    // Resetear UI de foto para permitir nueva carga
+    const fcZona = document.getElementById('fotoCompZona'); if(fcZona) fcZona.style.display = 'block';
+    const fcPrev = document.getElementById('fotoCompPreview'); if(fcPrev) fcPrev.style.display = 'none';
+    const fcGal = document.getElementById('fotoCompGal'); if(fcGal) fcGal.value = '';
+    const fcCam = document.getElementById('fotoCompCam'); if(fcCam) fcCam.value = '';
+    fotoComprobanteBase64 = null;
+  } else {
+    fotoSection.style.display = 'none';
+    fotoComprobanteBase64 = null;
+  }
 }
 
 function renderMediosPago() {
@@ -1486,13 +1496,26 @@ async function registrarVenta() {
   ok.classList.add('show');
   setTimeout(() => ok.classList.remove('show'), 4000);
 
-  // reset
-  tipoSeleccionado = null; pagoSeleccionado = null;
+  // reset completo
+  tipoSeleccionado = null;
+  pagoSeleccionado = null;
+  categoriaPulseraSeleccionada = null;
+  fotoComprobanteBase64 = null;
   document.getElementById('cantidad').value = 1;
   document.querySelectorAll('.tipo-btn,.pago-btn').forEach(b => b.classList.remove('selected'));
   document.getElementById('totalMonto').textContent = '$0';
   document.getElementById('ticketArea').classList.remove('show');
   document.getElementById('totalDetalle').textContent = '';
+  const fcGal = document.getElementById('fotoCompGal'); if(fcGal) fcGal.value = '';
+  const fcCam = document.getElementById('fotoCompCam'); if(fcCam) fcCam.value = '';
+  const fcPrev = document.getElementById('fotoCompPreview'); if(fcPrev) fcPrev.style.display = 'none';
+  const fcZona = document.getElementById('fotoCompZona'); if(fcZona) fcZona.style.display = 'block';
+  const fcSection = document.getElementById('fotoComprobanteSection'); if(fcSection) fcSection.style.display = 'none';
+  const pagoSec = document.getElementById('pagoSection'); if(pagoSec) pagoSec.style.display = 'block';
+  ['ticketera','invitado','tercera','anterior'].forEach(k => {
+    const p = document.getElementById('sub-panel-'+k); if(p) p.style.display='none';
+    const b = document.getElementById('grupo-btn-'+k); if(b) b.classList.remove('selected');
+  });
 }
 
 // ===== LISTA VENTAS =====
@@ -1780,15 +1803,22 @@ async function crearEvento() {
   const fecha = document.getElementById('eventoFecha').value;
   const moneda = document.getElementById('eventoMoneda').value;
 
-  // Collect tipos
-  const nombreInputs = document.querySelectorAll('.tipo-nombre-input');
+  // Collect tipos del formato compacto (data-nombre)
   const precioInputs = document.querySelectorAll('.tipo-precio-input');
   const tipos = [];
-  nombreInputs.forEach((inp, i) => {
-    const n = inp.value.trim();
-    const p = parseFloat(precioInputs[i].value);
+  precioInputs.forEach((inp) => {
+    const n = inp.getAttribute('data-nombre');
+    const p = parseFloat(inp.value);
     if (n && !isNaN(p) && p >= 0) tipos.push({ nombre: n, precio: p });
   });
+  // Agregar tipos gratuitos automáticamente
+  const gratuitos = [
+    'Ticketera General','Ticketera Parque Cerrado',
+    'Invitado General','Invitado Parque Cerrado',
+    'Tercera Edad/Menor General','Tercera Edad/Menor Parque Cerrado',
+    'Entrada Día Anterior General','Entrada Día Anterior Parque Cerrado'
+  ];
+  gratuitos.forEach(n => tipos.push({ nombre: n, precio: 0 }));
 
   if (!nombre || !fecha) { showErr('eventoError', 'Completa nombre y fecha.'); return; }
   const tiposPago = tipos.filter(t => t.precio > 0);
@@ -1909,26 +1939,18 @@ function abrirModalEvento() {
   document.getElementById('modalEvento').classList.add('show');
   const hoy = new Date().toISOString().split('T')[0];
   document.getElementById('eventoFecha').value = hoy;
-  // Pre-poblar tipos estándar
   const cont = document.getElementById('tiposContainer');
   if (cont) {
-    const tipos = [
-      {nombre:'General', precio:''},
-      {nombre:'Parque Cerrado', precio:''},
-      {nombre:'Ticketera General', precio:'0'},
-      {nombre:'Ticketera Parque Cerrado', precio:'0'},
-      {nombre:'Invitado General', precio:'0'},
-      {nombre:'Invitado Parque Cerrado', precio:'0'},
-      {nombre:'Tercera Edad/Menor General', precio:'0'},
-      {nombre:'Tercera Edad/Menor Parque Cerrado', precio:'0'},
-    ];
-    cont.innerHTML = tipos.map(t => `
-      <div class="tipo-input-row" style="display:flex;gap:8px;margin-bottom:8px">
-        <input type="text" class="tipo-nombre-input" placeholder="Nombre" value="${t.nombre}" style="flex:2;background:var(--gris2);border:1px solid var(--gris3);border-radius:8px;padding:10px;color:white;font-family:var(--font-body)">
-        <input type="number" class="tipo-precio-input" placeholder="Precio" value="${t.precio}" style="flex:1;background:var(--gris2);border:1px solid var(--gris3);border-radius:8px;padding:10px;color:white;font-family:var(--font-body)">
-      </div>`).join('');
+    cont.innerHTML = '<div style="background:#1a1a1a;border-radius:8px;padding:10px;margin-bottom:8px">' +
+      '<p style="font-size:11px;color:#aaa;margin-bottom:8px">Solo ingresa los precios. Los gratuitos (Ticketera, Invitado, Tercera Edad, Dia Anterior) se agregan solos.</p>' +
+      '<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center"><span style="flex:1;font-size:13px;color:white">General</span>' +
+      '<input type="number" class="tipo-precio-input" data-nombre="General" placeholder="Precio" style="width:120px;background:var(--gris2);border:1px solid var(--gris3);border-radius:8px;padding:10px;color:white;font-family:var(--font-body)"></div>' +
+      '<div style="display:flex;gap:8px;align-items:center"><span style="flex:1;font-size:13px;color:white">Parque Cerrado</span>' +
+      '<input type="number" class="tipo-precio-input" data-nombre="Parque Cerrado" placeholder="Precio" style="width:120px;background:var(--gris2);border:1px solid var(--gris3);border-radius:8px;padding:10px;color:white;font-family:var(--font-body)"></div></div>';
   }
 }
+
+
 function abrirModalUsuario() {
   document.getElementById('modalUsuario').classList.add('show');
   cargarUsuarios();
@@ -2305,7 +2327,8 @@ function actualizarPreviewRango() {
 
 async function cargarRango() {
   const ev = await getEventoActivo();
-  if(!ev||!ev.id){alert('No hay evento activo o el evento no tiene ID válido. Verifica en Admin → Eventos.');return;}
+  if(!ev||!ev.id){alert('No hay evento activo.');return;}
+  const cat = document.getElementById('cargaTipo').value; // general o parque_cerrado
   const inicio=document.getElementById('rangoInicio').value.trim();
   const fin=document.getElementById('rangoFin').value.trim();
   if(!inicio||!fin){alert('Ingresa número inicial y final.');return;}
@@ -2313,51 +2336,55 @@ async function cargarRango() {
   if(isNaN(nI)||isNaN(nF)||nF<nI){alert('Rango inválido.');return;}
   const total=nF-nI+1;
   if(total>6000){alert('Máximo 6000 pulseras por carga.');return;}
-  if(!confirm('¿Cargar '+total.toLocaleString()+' pulseras al stock?'))return;
+  const catNombre = cat==='general'?'General':'Parque Cerrado';
+  if(!confirm('¿Cargar '+total.toLocaleString()+' pulseras '+catNombre+' ('+inicio+' al '+fin+')?'))return;
   const padLen=Math.max(inicio.length,fin.length);
   const prog=document.getElementById('rangoProgress');
   const bar=document.getElementById('rangoBar');
   const status=document.getElementById('rangoStatus');
-  prog.style.display='block'; bar.style.width='0%';
-  // Verificar existentes
-  const {data:ex}=await dbP.from('pulseras').select('numero').eq('evento_id',ev.id);
+  prog.style.display='block'; bar.style.width='0%'; status.style.color='#aaa';
+  // Verificar existentes de esa categoría
+  const {data:ex}=await dbP.from('pulseras').select('numero').eq('evento_id',ev.id).eq('tipo',cat);
   const yaExisten=new Set((ex||[]).map(p=>p.numero));
   const lote=[];
   for(let n=nI;n<=nF;n++){
     const num=String(n).padStart(padLen,'0');
-    if(!yaExisten.has(num)) lote.push({numero:num,tipo:'sin_asignar',evento_id:ev.id,estado:'disponible'});
+    if(!yaExisten.has(num)) lote.push({numero:num,tipo:cat,evento_id:ev.id,estado:'disponible'});
   }
-  if(lote.length===0){alert('Todas las pulseras de ese rango ya están en el stock.');prog.style.display='none';return;}
+  if(lote.length===0){alert('Todas las pulseras de ese rango ya están cargadas en '+catNombre+'.');prog.style.display='none';return;}
   const BATCH=200; let cargadas=0;
   for(let i=0;i<lote.length;i+=BATCH){
-    await dbP.from('pulseras').insert(lote.slice(i,i+BATCH));
+    const {error}=await dbP.from('pulseras').insert(lote.slice(i,i+BATCH));
+    if(error){status.style.color='#e8001d';status.textContent='Error: '+error.message;return;}
     cargadas+=Math.min(BATCH,lote.length-i);
     const pct=Math.round(cargadas/lote.length*100);
     bar.style.width=pct+'%';
     status.textContent=cargadas.toLocaleString()+' / '+lote.length.toLocaleString()+' cargadas…';
-    await new Promise(r=>setTimeout(r,30));
+    await new Promise(r=>setTimeout(r,20));
   }
   bar.style.width='100%'; status.style.color='#4caf50';
-  status.textContent='✅ '+lote.length.toLocaleString()+' pulseras cargadas correctamente';
+  status.textContent='✅ '+lote.length.toLocaleString()+' pulseras '+catNombre+' cargadas';
   setTimeout(()=>{prog.style.display='none';status.style.color='#aaa';},4000);
   document.getElementById('rangoInicio').value='';
   document.getElementById('rangoFin').value='';
   document.getElementById('rangoPreview').textContent='';
   cargarListaCargadas();
+  cargarResumenAsignacion();
 }
 
 async function agregarPulseraSuelta() {
-  const ev=await getEventoActivo(); if(!ev){alert('No hay evento activo.');return;}
+  const ev=await getEventoActivo(); if(!ev||!ev.id){alert('No hay evento activo.');return;}
+  const cat=document.getElementById('cargaTipo').value;
   const numero=document.getElementById('pulseraIndividual').value.trim();
   if(!numero){alert('Ingresa el número de pulsera.');return;}
-  const {data:ex}=await dbP.from('pulseras').select('id').eq('evento_id',ev.id).eq('numero',numero);
-  if(ex&&ex.length>0){
-    mostrarMsgCarga('⚠️ El número '+numero+' ya está en el stock.','#e8001d'); return;
-  }
-  await dbP.from('pulseras').insert({numero,tipo:'sin_asignar',evento_id:ev.id,estado:'disponible'});
-  mostrarMsgCarga('✅ Pulsera #'+numero+' agregada.','#4caf50');
+  const {data:ex}=await dbP.from('pulseras').select('id').eq('evento_id',ev.id).eq('numero',numero).eq('tipo',cat);
+  if(ex&&ex.length>0){mostrarMsgCarga('⚠️ El número '+numero+' ya está en el stock.','#e8001d');return;}
+  const {error}=await dbP.from('pulseras').insert({numero,tipo:cat,evento_id:ev.id,estado:'disponible'});
+  if(error){mostrarMsgCarga('Error: '+error.message,'#e8001d');return;}
+  mostrarMsgCarga('✅ Pulsera #'+numero+' ('+(cat==='general'?'General':'Parque Cerrado')+') agregada.','#4caf50');
   document.getElementById('pulseraIndividual').value='';
   cargarListaCargadas();
+  cargarResumenAsignacion();
 }
 
 function mostrarMsgCarga(txt,color){
@@ -2434,42 +2461,33 @@ async function asignarCategoria(){
 }
 
 async function cargarResumenAsignacion(){
-  const ev=await getEventoActivo(); if(!ev)return;
-  const {data:lotes}=await dbP.from('pulseras_lotes').select('*').eq('evento_id',ev.id);
-  const {data:sinAsignar}=await dbP.from('pulseras').select('id',{count:'exact'}).eq('evento_id',ev.id).eq('tipo','sin_asignar');
+  const ev=await getEventoActivo(); if(!ev||!ev.id)return;
+  const {data:pulseras}=await dbP.from('pulseras').select('tipo,estado,numero').eq('evento_id',ev.id);
   const cont=document.getElementById('resumenAsignacion'); if(!cont)return;
+  if(!pulseras||pulseras.length===0){cont.innerHTML='<p style="font-size:12px;color:#555;text-align:center;padding:8px">Sin pulseras cargadas aún.</p>';return;}
   const catInfo={general:{label:'🟢 General',color:'#4caf50',bg:'#0d1f0d'},parque_cerrado:{label:'🔵 Parque Cerrado',color:'#4a90d9',bg:'#0a0d1f'},vip:{label:'⭐ VIP',color:'#f0a800',bg:'#1a1500'}};
-  let html='<p style="font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Asignación actual</p>';
-  if(lotes&&lotes.length>0){
-    lotes.forEach(l=>{
-      const ci=catInfo[l.categoria]||{label:l.categoria,color:'#aaa',bg:'#1a1a1a'};
-      const disp=l.total-l.vendidas;
-      html+=`<div style="background:${ci.bg};border:1px solid ${ci.color}33;border-radius:10px;padding:12px;margin-bottom:8px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <span style="font-weight:700;color:${ci.color};font-size:14px">${ci.label}</span>
-          <span style="font-size:18px;font-weight:800;color:${ci.color}">${l.total.toLocaleString()} pulseras</span>
-        </div>
-        <div style="background:#00000033;border-radius:6px;padding:8px;font-size:12px">
-          <div style="display:flex;justify-content:space-between;margin-bottom:2px">
-            <span style="color:#888">Rango asignado</span>
-            <span style="font-weight:700;letter-spacing:1px">#${l.num_inicio} → #${l.num_fin}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:2px">
-            <span style="color:#888">Vendidas</span>
-            <span style="color:#e8001d;font-weight:700">${l.vendidas}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between">
-            <span style="color:#888">Disponibles</span>
-            <span style="color:#4caf50;font-weight:700">${disp}</span>
-          </div>
-        </div>
-      </div>`;
-    });
-  }
-  const sinA=sinAsignar?.length||0;
-  if(sinA>0) html+=`<div style="background:#1a1a1a;border:1px solid #333;border-radius:10px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center"><span style="color:#666;font-size:13px">⬜ Sin asignar</span><span style="font-weight:700;color:#555">${sinA.toLocaleString()} pulseras</span></div>`;
-  if(!lotes?.length&&!sinA) html+='<p style="font-size:12px;color:#555;text-align:center">Sin pulseras cargadas aún.</p>';
-  cont.innerHTML=html;
+  let html='';
+  ['general','parque_cerrado','vip'].forEach(cat=>{
+    const delTipo=pulseras.filter(p=>p.tipo===cat);
+    if(delTipo.length===0)return;
+    const ci=catInfo[cat];
+    const vendidas=delTipo.filter(p=>p.estado==='vendida').length;
+    const disp=delTipo.length-vendidas;
+    const nums=delTipo.map(p=>p.numero).sort();
+    const rango=nums.length>0?('#'+nums[0]+' → #'+nums[nums.length-1]):'—';
+    html+=`<div style="background:${ci.bg};border:1px solid ${ci.color}33;border-radius:10px;padding:12px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-weight:700;color:${ci.color};font-size:14px">${ci.label}</span>
+        <span style="font-size:18px;font-weight:800;color:${ci.color}">${delTipo.length.toLocaleString()} pulseras</span>
+      </div>
+      <div style="background:#00000033;border-radius:6px;padding:8px;font-size:12px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#888">Rango</span><span style="font-weight:700;letter-spacing:1px">${rango}</span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="color:#888">Vendidas</span><span style="color:#e8001d;font-weight:700">${vendidas}</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:#888">Disponibles</span><span style="color:#4caf50;font-weight:700">${disp}</span></div>
+      </div>
+    </div>`;
+  });
+  cont.innerHTML=html||'<p style="font-size:12px;color:#555;text-align:center">Sin pulseras.</p>';
 }
 
 // ===== TAB STOCK =====
@@ -2553,19 +2571,18 @@ async function exportarExcelPulseras(){
 }
 
 async function descontarPulsera(vendedorId, tipoEntrada, catPulsera) {
-  const ev=await getEventoActivo(); if(!ev)return;
+  const ev=await getEventoActivo(); if(!ev||!ev.id)return;
   let tipo = catPulsera || null;
   if(!tipo){
     const n=tipoEntrada.toLowerCase();
-    tipo=n.includes('parque')||n.includes('invitado')?'parque_cerrado':
-         n.includes('general')?'general':
-         n.includes('vip')?'vip':null;
+    tipo = n.includes('parque')?'parque_cerrado':n.includes('general')?'general':n.includes('vip')?'vip':null;
   }
   if(!tipo)return;
-  const {data:sig}=await dbP.from('pulseras').select('id').eq('evento_id',ev.id).eq('tipo',tipo).eq('estado','asignada').order('numero').limit(1);
-  if(sig&&sig.length>0) await dbP.from('pulseras').update({estado:'vendida'}).eq('id',sig[0].id);
-  const {data:lote}=await dbP.from('pulseras_lotes').select('*').eq('evento_id',ev.id).eq('categoria',tipo);
-  if(lote&&lote.length>0) await dbP.from('pulseras_lotes').update({vendidas:lote[0].vendidas+1}).eq('id',lote[0].id);
+  // Buscar próxima pulsera disponible o asignada de esa categoría
+  const {data:sig}=await dbP.from('pulseras').select('id').eq('evento_id',ev.id).eq('tipo',tipo).in('estado',['disponible','asignada']).order('numero').limit(1);
+  if(sig&&sig.length>0){
+    await dbP.from('pulseras').update({estado:'vendida'}).eq('id',sig[0].id);
+  }
 }
 
 async function cargarSelectVendedoras() {
