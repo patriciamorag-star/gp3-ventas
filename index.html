@@ -1530,6 +1530,22 @@ async function registrarVenta() {
 }
 
 // ===== LISTA VENTAS =====
+async function verComprobante(ventaId) {
+  const { data, error } = await db.from('ventas').select('foto_comprobante,tipo_entrada,total,moneda,fecha,vendedor_nombre').eq('id', ventaId).single();
+  if (error || !data || !data.foto_comprobante) { alert('No se encontró el comprobante.'); return; }
+  const modal = document.getElementById('modalComprobante');
+  const img = document.getElementById('comprobanteImg');
+  const info = document.getElementById('comprobanteInfo');
+  img.src = data.foto_comprobante;
+  info.textContent = data.tipo_entrada + ' · ' + formatMonto(data.total, data.moneda) + ' · ' + (data.vendedor_nombre || '') + ' · ' + formatHora(data.fecha);
+  modal.style.display = 'flex';
+}
+
+function cerrarComprobante() {
+  document.getElementById('modalComprobante').style.display = 'none';
+  document.getElementById('comprobanteImg').src = '';
+}
+
 async function cargarVentas() {
   const cont = document.getElementById('listaVentas');
   const hoy = new Date().toISOString().split('T')[0];
@@ -1561,6 +1577,8 @@ async function cargarVentas() {
           `<button class="btn btn-sm btn-verde" onclick="confirmarTransf('${v.id}')">✓ CONFIRMAR</button>` : ''}
         ${v.estado !== 'anulada' && (perfilUsuario?.rol === 'admin' || perfilUsuario?.rol === 'oficina') ?
           `<button class="btn btn-sm" style="background:rgba(232,0,29,0.2);color:var(--rojo)" onclick="anularVentaLista('${v.id}')">✗ ANULAR</button>` : ''}
+        ${v.foto_comprobante ?
+          `<button class="btn btn-sm" style="background:rgba(74,144,217,0.2);color:#4a90d9" onclick="verComprobante('${v.id}')">👁 VER COMPROBANTE</button>` : ''}
       </div>
     </div>`).join('');
 }
@@ -2989,5 +3007,17 @@ window.addEventListener('load', function() {
   <div class="dash-footer">GP3 SPORTS · DASHBOARD DE SUPERVISIÓN · SOLO LECTURA</div>
 </div>
 
+
+<!-- MODAL VER COMPROBANTE -->
+<div id="modalComprobante" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:9999;align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)cerrarComprobante()">
+  <div style="background:var(--gris);border-radius:16px;padding:20px;max-width:500px;width:100%;max-height:90vh;overflow-y:auto;border-top:2px solid #4a90d9">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h3 style="font-family:var(--font-titulo);font-size:18px;color:#4a90d9;letter-spacing:1px;margin:0">🧾 COMPROBANTE</h3>
+      <button onclick="cerrarComprobante()" style="background:none;border:none;color:#888;font-size:24px;cursor:pointer;line-height:1">×</button>
+    </div>
+    <p id="comprobanteInfo" style="font-size:12px;color:#aaa;margin-bottom:12px"></p>
+    <img id="comprobanteImg" src="" alt="Comprobante" style="width:100%;border-radius:8px;display:block">
+  </div>
+</div>
 </body>
 </html>
