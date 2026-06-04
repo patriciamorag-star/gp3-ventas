@@ -2166,6 +2166,11 @@ function generarExcelResumen(data, nombreEvento, nombreArchivo) {
   filas.push(['Sin cobro (ticketera, invitado, tercera edad)', granCantGr - totalDiaAnterior]);
   filas.push(['Reingresos día anterior', totalDiaAnterior]);
   filas.push(['TOTAL GENERAL DE PERSONAS QUE INGRESARON', granPersonas]);
+  filas.push([]);
+  filas.push(['RESUMEN DE DINERO']);
+  filas.push(['Total ventas en EFECTIVO', fmt(granEfectivo)]);
+  filas.push(['Total ventas por TRANSFERENCIA', fmt(granTransf)]);
+  filas.push(['VALOR TOTAL RECAUDADO', fmt(granTotal)]);
 
   descargarCSV(filas, nombreArchivo);
 }
