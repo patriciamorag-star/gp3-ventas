@@ -562,7 +562,7 @@
 
 <!-- LOGIN -->
 <div id="loginView" class="login-wrap">
-  <div style="margin-bottom:32px"><img src="logo-v2.png" alt="GP3 Sports" style="height:80px;object-fit:contain;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.5))"><div style="font-size:10px;color:#4caf50;margin-top:8px;letter-spacing:1px">VERSIÓN 2.1 · 03 JUN</div></div>
+  <div style="margin-bottom:32px"><img src="logo-v2.png" alt="GP3 Sports" style="height:80px;object-fit:contain;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.5))"></div>
   <div class="login-card">
     <h2>ACCEDER</h2>
     <div style="display:flex;gap:8px;margin-bottom:20px">
@@ -726,6 +726,13 @@
 
   <!-- TAB ADMIN -->
   <div class="view" id="view-admin">
+    <div class="card">
+      <div class="card-title">📊 Dashboard de Supervisión</div>
+      <p style="font-size:12px;color:#aaa;margin-bottom:12px">Vista en tiempo real para los jefes (solo lectura).</p>
+      <button class="btn btn-rojo" style="margin-bottom:8px" onclick="window.open('?view=dashboard','_blank')">📊 ABRIR DASHBOARD</button>
+      <button class="btn btn-gris" onclick="copiarLinkDashboard()">🔗 COPIAR LINK PARA JEFES</button>
+      <p id="linkCopiado" style="font-size:11px;color:#4caf50;margin-top:8px;display:none">✅ Link copiado al portapapeles</p>
+    </div>
     <div class="card">
       <div class="card-title">🏁 Eventos</div>
       <button class="btn btn-rojo" style="margin-bottom:14px" onclick="abrirModalEvento()">+ NUEVO EVENTO</button>
@@ -2685,6 +2692,14 @@ async function cargarPulserasAdmin(){
 let dashInterval = null;
 let dashMoneda = 'CLP';
 
+function copiarLinkDashboard() {
+  const link = window.location.origin + window.location.pathname + '?view=dashboard';
+  navigator.clipboard.writeText(link).then(() => {
+    const msg = document.getElementById('linkCopiado');
+    if (msg) { msg.style.display = 'block'; setTimeout(() => msg.style.display = 'none', 3000); }
+  }).catch(() => { prompt('Copia este link para los jefes:', link); });
+}
+
 function mostrarDashboard() {
   document.getElementById('loginView').style.display = 'none';
   document.getElementById('appView').style.display = 'none';
@@ -2720,7 +2735,6 @@ async function cargarDashboard() {
     document.getElementById('dStatEfectivo').textContent = formatMonto(0, dashMoneda);
     document.getElementById('dStatTransferencia').textContent = formatMonto(0, dashMoneda);
     document.getElementById('dCategorias').innerHTML = '<div class="empty-state">Sin ventas hoy.</div>';
-    document.getElementById('dPendientes').innerHTML = '<div style="color:#555;font-size:13px;padding:8px 0">Sin transferencias pendientes ✅</div>';
     // Pulseras incluso sin ventas
     if (eventoActivo) {
       const { data: pLotes0 } = await dbP.from('pulseras_lotes').select('*').eq('evento_id', eventoActivo.id);
@@ -2768,23 +2782,6 @@ async function cargarDashboard() {
         </div>
       </div>`;
   }).join('');
-
-  const { data: pend } = await db.from('ventas').select('*').eq('estado','pendiente').order('fecha',{ascending:true});
-  const contPend = document.getElementById('dPendientes');
-  if (!pend || pend.length === 0) {
-    contPend.innerHTML = '<div style="color:#555;font-size:13px;padding:8px 0">Sin transferencias pendientes ✅</div>';
-  } else {
-    contPend.innerHTML = pend.map(v => `
-      <div class="d-tabla-row">
-        <div>
-          <div style="font-weight:600;color:white">${v.tipo_entrada} × ${v.cantidad}</div>
-          <div style="font-size:12px;color:#666">${v.vendedor_nombre} · ${formatHora(v.fecha)}</div>
-        </div>
-        <div style="text-align:right">
-          <div class="d-tabla-valor amarillo">${formatMonto(v.total, v.moneda)}</div>
-        </div>
-      </div>`).join('');
-  }
 
   const el = document.getElementById('dashUltimaAct');
   if (el) el.textContent = new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
@@ -3034,12 +3031,8 @@ window.addEventListener('load', function() {
     </div>
 
     <div class="d-card">
-      <div class="d-card-title">🟡 Transferencias pendientes</div>
-      <div class="dash-card" style="margin-bottom:12px">
-        <div class="dash-card-title">🎫 PULSERAS</div>
-        <div id="dPulseras"><div class="empty-state"><div class="icon">🎫</div>Cargando...</div></div>
-      </div>
-      <div id="dPendientes"><div class="empty-state">Sin pendientes ✅</div></div>
+      <div class="d-card-title">🎫 Pulseras por categoría</div>
+      <div id="dPulseras"><div class="empty-state"><div class="icon">🎫</div>Cargando...</div></div>
     </div>
   </div>
 
