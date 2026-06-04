@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>GP3 Sports — Ventas</title>
+<title>GP3 Ventas v2.1</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -562,7 +562,7 @@
 
 <!-- LOGIN -->
 <div id="loginView" class="login-wrap">
-  <div style="margin-bottom:32px"><img src="logo-v2.png" alt="GP3 Sports" style="height:80px;object-fit:contain;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.5))"></div>
+  <div style="margin-bottom:32px"><img src="logo-v2.png" alt="GP3 Sports" style="height:80px;object-fit:contain;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.5))"><div style="font-size:10px;color:#4caf50;margin-top:8px;letter-spacing:1px">VERSIÓN 2.1 · 03 JUN</div></div>
   <div class="login-card">
     <h2>ACCEDER</h2>
     <div style="display:flex;gap:8px;margin-bottom:20px">
@@ -760,6 +760,14 @@
       <div id="ptCargar">
         <div style="background:#1a1a1a;border:1px solid #333;border-radius:10px;padding:14px;margin-bottom:10px">
           <p style="font-size:12px;font-weight:700;color:#f0a800;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">📦 Carga por rango</p>
+          <div style="margin-bottom:10px">
+            <label style="font-size:11px;color:#aaa;display:block;margin-bottom:4px">Categoría de pulsera</label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <button type="button" id="cargaCatGen" onclick="setCargaCat('general')" style="background:#0d1f0d;border:2px solid #4caf50;border-radius:8px;color:#4caf50;font-weight:700;padding:10px;cursor:pointer;font-size:13px">🟢 General</button>
+              <button type="button" id="cargaCatPC" onclick="setCargaCat('parque_cerrado')" style="background:var(--gris2);border:2px solid var(--gris3);border-radius:8px;color:#888;font-weight:700;padding:10px;cursor:pointer;font-size:13px">🔵 Parque Cerrado</button>
+            </div>
+            <input type="hidden" id="cargaTipo" value="general">
+          </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
             <div>
               <label style="font-size:11px;color:#aaa;display:block;margin-bottom:4px">Número inicial</label>
@@ -2323,6 +2331,19 @@ function actualizarPreviewRango() {
   if(prev&&!isNaN(na)&&!isNaN(nb)&&nb>=na){
     prev.textContent=(nb-na+1).toLocaleString()+' pulseras a cargar';
   } else if(prev){prev.textContent='';}
+}
+
+function setCargaCat(cat) {
+  document.getElementById('cargaTipo').value = cat;
+  const gen = document.getElementById('cargaCatGen');
+  const pc = document.getElementById('cargaCatPC');
+  if (cat === 'general') {
+    gen.style.background='#0d1f0d'; gen.style.borderColor='#4caf50'; gen.style.color='#4caf50';
+    pc.style.background='var(--gris2)'; pc.style.borderColor='var(--gris3)'; pc.style.color='#888';
+  } else {
+    pc.style.background='#0a0d1f'; pc.style.borderColor='#4a90d9'; pc.style.color='#4a90d9';
+    gen.style.background='var(--gris2)'; gen.style.borderColor='var(--gris3)'; gen.style.color='#888';
+  }
 }
 
 async function cargarRango() {
