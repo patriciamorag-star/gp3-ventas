@@ -2090,19 +2090,27 @@ function descargarCSV(filas, nombre) {
 }
 
 function generarExcelResumen(data, nombreEvento, nombreArchivo) {
-  // Group by date and tipo+pago
+  // Agrupar por día y tipo, clasificando en 3 categorías de pago
   const dias = {};
+  let totalDiaAnterior = 0;
+  const totalPorTipo = {}; // total de personas por cada tipo de entrada (todo el evento)
   data.forEach(v => {
     const dia = new Date(v.fecha).toLocaleDateString('es-CL');
     if (!dias[dia]) dias[dia] = {};
     const key = v.tipo_entrada;
-    if (!dias[dia][key]) dias[dia][key] = { efectivo: 0, transferencia: 0, cantEfectivo: 0, cantTransf: 0 };
+    if (!dias[dia][key]) dias[dia][key] = { efectivo: 0, transferencia: 0, cantEfectivo: 0, cantTransf: 0, cantGratis: 0 };
     if (v.medio_pago === 'efectivo') {
       dias[dia][key].efectivo += v.total;
       dias[dia][key].cantEfectivo += v.cantidad;
-    } else {
+    } else if (v.medio_pago === 'transferencia') {
       dias[dia][key].transferencia += v.total;
       dias[dia][key].cantTransf += v.cantidad;
+    } else {
+      dias[dia][key].cantGratis += v.cantidad;
+    }
+    totalPorTipo[key] = (totalPorTipo[key] || 0) + v.cantidad;
+    if (v.tipo_entrada && v.tipo_entrada.toLowerCase().includes('anterior')) {
+      totalDiaAnterior += v.cantidad;
     }
   });
 
@@ -2113,27 +2121,51 @@ function generarExcelResumen(data, nombreEvento, nombreArchivo) {
     ['GP3 SPORTS — RESUMEN DE VENTAS'],
     ['Campeonato: ' + nombreEvento],
     [],
-    ['Fecha', 'Tipo de Entrada', 'Cant. Efectivo', 'Total Efectivo', 'Cant. Transferencia', 'Total Transferencia', 'Total']
+    ['Fecha', 'Tipo de Entrada', 'Cant. Efectivo', 'Total Efectivo', 'Cant. Transferencia', 'Total Transferencia', 'Cant. Sin Cobro', 'Total Personas', 'Total $']
   ];
 
-  let granEfectivo = 0, granTransf = 0, granTotal = 0;
+  let granEfectivo = 0, granTransf = 0, granCantEf = 0, granCantTr = 0, granCantGr = 0;
 
   Object.entries(dias).sort().forEach(([dia, tipos]) => {
-    let diaEfectivo = 0, diaTransf = 0;
+    let diaEfectivo = 0, diaTransf = 0, diaCantGr = 0, diaPersonas = 0;
     Object.entries(tipos).forEach(([tipo, vals]) => {
       const totalTipo = vals.efectivo + vals.transferencia;
-      filas.push([dia, tipo, vals.cantEfectivo, fmt(vals.efectivo), vals.cantTransf, fmt(vals.transferencia), fmt(totalTipo)]);
+      const personasTipo = vals.cantEfectivo + vals.cantTransf + vals.cantGratis;
+      filas.push([dia, tipo, vals.cantEfectivo, fmt(vals.efectivo), vals.cantTransf, fmt(vals.transferencia), vals.cantGratis, personasTipo, fmt(totalTipo)]);
       diaEfectivo += vals.efectivo;
       diaTransf += vals.transferencia;
+      diaCantGr += vals.cantGratis;
+      diaPersonas += personasTipo;
+      granCantEf += vals.cantEfectivo;
+      granCantTr += vals.cantTransf;
+      granCantGr += vals.cantGratis;
     });
-    filas.push(['SUBTOTAL ' + dia, '', '', fmt(diaEfectivo), '', fmt(diaTransf), fmt(diaEfectivo + diaTransf)]);
+    filas.push(['SUBTOTAL ' + dia, '', '', fmt(diaEfectivo), '', fmt(diaTransf), diaCantGr, diaPersonas, fmt(diaEfectivo + diaTransf)]);
     filas.push([]);
     granEfectivo += diaEfectivo;
     granTransf += diaTransf;
   });
 
-  granTotal = granEfectivo + granTransf;
-  filas.push(['TOTAL EVENTO', '', '', fmt(granEfectivo), '', fmt(granTransf), fmt(granTotal)]);
+  const granTotal = granEfectivo + granTransf;
+  const granPersonas = granCantEf + granCantTr + granCantGr;
+  filas.push(['TOTAL EVENTO', '', granCantEf, fmt(granEfectivo), granCantTr, fmt(granTransf), granCantGr, granPersonas, fmt(granTotal)]);
+  filas.push([]);
+
+  // TOTAL DE PERSONAS POR TIPO DE ENTRADA (todo el evento)
+  filas.push(['TOTAL DE PERSONAS POR TIPO DE ENTRADA']);
+  filas.push(['Tipo de Entrada', 'Total Personas']);
+  Object.entries(totalPorTipo).sort((a,b)=>b[1]-a[1]).forEach(([tipo, cant]) => {
+    filas.push([tipo, cant]);
+  });
+  filas.push([]);
+
+  // RESUMEN GENERAL DE INGRESOS
+  filas.push(['RESUMEN GENERAL DE INGRESOS (PERSONAS)']);
+  filas.push(['Pagadas en efectivo', granCantEf]);
+  filas.push(['Pagadas por transferencia', granCantTr]);
+  filas.push(['Sin cobro (ticketera, invitado, tercera edad)', granCantGr - totalDiaAnterior]);
+  filas.push(['Reingresos día anterior', totalDiaAnterior]);
+  filas.push(['TOTAL GENERAL DE PERSONAS QUE INGRESARON', granPersonas]);
 
   descargarCSV(filas, nombreArchivo);
 }
