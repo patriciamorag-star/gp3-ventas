@@ -758,16 +758,17 @@
 
       <!-- TAB CARGAR -->
       <div id="ptCargar">
+        <div style="background:#1a1500;border:2px solid #f0a800;border-radius:10px;padding:14px;margin-bottom:10px">
+          <p style="font-size:12px;font-weight:700;color:#f0a800;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">1️⃣ Elige categoría (aplica a rango y suelta)</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <button type="button" id="cargaCatGen" onclick="setCargaCat('general')" style="background:#0d1f0d;border:2px solid #4caf50;border-radius:8px;color:#4caf50;font-weight:700;padding:12px;cursor:pointer;font-size:14px">🟢 General</button>
+            <button type="button" id="cargaCatPC" onclick="setCargaCat('parque_cerrado')" style="background:var(--gris2);border:2px solid var(--gris3);border-radius:8px;color:#888;font-weight:700;padding:12px;cursor:pointer;font-size:14px">🔵 Parque Cerrado</button>
+          </div>
+          <input type="hidden" id="cargaTipo" value="general">
+          <p id="cargaCatLabel" style="font-size:11px;color:#4caf50;text-align:center;margin-top:8px;font-weight:600">Cargando en: 🟢 GENERAL</p>
+        </div>
         <div style="background:#1a1a1a;border:1px solid #333;border-radius:10px;padding:14px;margin-bottom:10px">
           <p style="font-size:12px;font-weight:700;color:#f0a800;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">📦 Carga por rango</p>
-          <div style="margin-bottom:10px">
-            <label style="font-size:11px;color:#aaa;display:block;margin-bottom:4px">Categoría de pulsera</label>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-              <button type="button" id="cargaCatGen" onclick="setCargaCat('general')" style="background:#0d1f0d;border:2px solid #4caf50;border-radius:8px;color:#4caf50;font-weight:700;padding:10px;cursor:pointer;font-size:13px">🟢 General</button>
-              <button type="button" id="cargaCatPC" onclick="setCargaCat('parque_cerrado')" style="background:var(--gris2);border:2px solid var(--gris3);border-radius:8px;color:#888;font-weight:700;padding:10px;cursor:pointer;font-size:13px">🔵 Parque Cerrado</button>
-            </div>
-            <input type="hidden" id="cargaTipo" value="general">
-          </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
             <div>
               <label style="font-size:11px;color:#aaa;display:block;margin-bottom:4px">Número inicial</label>
@@ -1265,17 +1266,19 @@ function selTipoIdx(idx) {
   const esTicketera = tipo && nombre.includes('ticketera');
   const esInvitado = nombre.includes('invitado');
   const esTerceraOMenor = nombre.includes('tercera') || nombre.includes('menor');
-  const esGratuito = esTicketera || esInvitado || esTerceraOMenor;
-  const necesitaCategoria = esInvitado || esTerceraOMenor;
+  const esDiaAnterior = nombre.includes('anterior');
+  const esGratuito = esTicketera || esInvitado || esTerceraOMenor || esDiaAnterior;
+  const necesitaCategoria = esInvitado || esTerceraOMenor || esDiaAnterior;
   const pagoSection = document.getElementById('pagoSection');
   if (pagoSection) pagoSection.style.display = esGratuito ? 'none' : 'block';
   if (esTicketera) pagoSeleccionado = 'ticketera';
-  if (esInvitado) pagoSeleccionado = 'gratuito';
+  if (esInvitado) pagoSeleccionado = 'invitado';
   if (esTerceraOMenor) pagoSeleccionado = 'gratuito';
-  // Categoría pulsera — invitado, tercera edad y menor eligen categoría
+  if (esDiaAnterior) pagoSeleccionado = 'reingreso';
+  // Categoría pulsera — sub-botones manejan la categoría (NO resetear para gratuitos con categoría)
   const catSection = document.getElementById('categoriaPulseraSection');
-  if (catSection) catSection.style.display = 'none'; // Sub-botones manejan la categoría
-  if (!necesitaCategoria) categoriaPulseraSeleccionada = null;
+  if (catSection) catSection.style.display = 'none';
+  if (!esGratuito) categoriaPulseraSeleccionada = null;
   // Reset foto comprobante
   document.getElementById('fotoComprobanteSection').style.display = 'none';
   fotoComprobanteBase64 = null;
@@ -2337,12 +2340,15 @@ function setCargaCat(cat) {
   document.getElementById('cargaTipo').value = cat;
   const gen = document.getElementById('cargaCatGen');
   const pc = document.getElementById('cargaCatPC');
+  const lbl = document.getElementById('cargaCatLabel');
   if (cat === 'general') {
     gen.style.background='#0d1f0d'; gen.style.borderColor='#4caf50'; gen.style.color='#4caf50';
     pc.style.background='var(--gris2)'; pc.style.borderColor='var(--gris3)'; pc.style.color='#888';
+    if(lbl){lbl.textContent='Cargando en: 🟢 GENERAL'; lbl.style.color='#4caf50';}
   } else {
     pc.style.background='#0a0d1f'; pc.style.borderColor='#4a90d9'; pc.style.color='#4a90d9';
     gen.style.background='var(--gris2)'; gen.style.borderColor='var(--gris3)'; gen.style.color='#888';
+    if(lbl){lbl.textContent='Cargando en: 🔵 PARQUE CERRADO'; lbl.style.color='#4a90d9';}
   }
 }
 
@@ -2416,7 +2422,7 @@ function mostrarMsgCarga(txt,color){
 
 async function cargarListaCargadas(){
   const ev=await getEventoActivo(); if(!ev)return;
-  const {data}=await dbP.from('pulseras').select('numero,estado,tipo').eq('evento_id',ev.id).order('numero',{ascending:false}).limit(15);
+  const {data}=await dbP.from('pulseras').select('id,numero,estado,tipo').eq('evento_id',ev.id).order('numero',{ascending:false}).limit(15);
   const cont=document.getElementById('listaCargadas'); if(!cont)return;
   if(!data||data.length===0){cont.innerHTML='<p style="font-size:12px;color:#555;text-align:center;padding:8px">Sin pulseras cargadas aún</p>';return;}
   const colores={sin_asignar:'#666',general:'#4caf50',parque_cerrado:'#4a90d9',vip:'#f0a800'};
