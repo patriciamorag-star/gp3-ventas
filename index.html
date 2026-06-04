@@ -1234,13 +1234,19 @@ function selTipoIdx(idx) {
     const p = document.getElementById('sub-panel-'+k); if(p) p.style.display='none';
     const b = document.getElementById('grupo-btn-'+k); if(b) b.classList.remove('selected');
   });
-  // Resaltar grupo padre si es gratuito
+  // Resaltar grupo padre si es gratuito + setear categoriaPulsera
   const tiposHL = getTipos();
   const tipoHL = tiposHL[idx];
   if (tipoHL && tipoHL.precio === 0) {
     const nomHL = tipoHL.nombre.toLowerCase();
     const keyHL = nomHL.includes('ticketera')?'ticketera':nomHL.includes('invitado')?'invitado':nomHL.includes('tercera')||nomHL.includes('menor')?'tercera':nomHL.includes('anterior')?'anterior':null;
     if (keyHL) { const gb=document.getElementById('grupo-btn-'+keyHL); if(gb) gb.classList.add('selected'); }
+    // Setear categoría automáticamente desde el nombre del tipo
+    if (nomHL.includes('general') && !nomHL.includes('parque')) categoriaPulseraSeleccionada = 'general';
+    else if (nomHL.includes('parque')) categoriaPulseraSeleccionada = 'parque_cerrado';
+    else categoriaPulseraSeleccionada = null;
+  } else {
+    categoriaPulseraSeleccionada = null;
   }
   document.getElementById('tipo-idx-' + idx).classList.add('selected');
   const tipos = getTipos();
@@ -1400,6 +1406,7 @@ async function registrarVenta() {
   const btn = document.getElementById('btnVender');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>REGISTRANDO...';
+  try {
 
   // Validar categoría pulsera para tercera edad/menor
   const nombreTipo = tipoObj.nombre.toLowerCase();
@@ -1431,7 +1438,7 @@ async function registrarVenta() {
   const esGratuitoFinal = esTicketera || esInvitadoV || esTerceraOMenorV || esDiaAnteriorV;
   const estadoFinal = esGratuitoFinal ? 'confirmada' : pagoSeleccionado === 'transferencia' ? 'pendiente' : 'confirmada';
   const { error } = await db.from('ventas').insert({
-    evento_id: eventoActivo.id,
+    evento_id: eventoActivo?.id || null,
     vendedor_id: usuario.id,
     vendedor_nombre: perfilUsuario?.nombre || usuario.email,
     tipo_entrada: tipoObj.nombre,
@@ -1454,7 +1461,13 @@ async function registrarVenta() {
   }
 
   if (error) {
-    showErr('ventaError', 'Error al registrar. Intenta de nuevo.');
+    showErr('ventaError', 'Error: ' + (error.message || 'Error al registrar'));
+    return;
+  }
+  } catch(e) {
+    btn.disabled = false;
+    btn.innerHTML = 'REGISTRAR VENTA';
+    showErr('ventaError', 'Error inesperado: ' + e.message);
     return;
   }
 
@@ -2363,8 +2376,8 @@ async function cargarListaCargadas(){
       <span style="color:${colores[p.tipo]||'#666'};flex:1">${p.tipo==='sin_asignar'?'Sin asignar':p.tipo==='general'?'General':p.tipo==='parque_cerrado'?'Parque Cerrado':'VIP'}</span>
       <span style="color:${p.estado==='disponible'?'#4caf50':p.estado==='asignada'?'#4a90d9':'#e8001d'};min-width:55px">${p.estado}</span>
       <div style="display:flex;gap:4px">
-        <button onclick="editarPulsera('${p.id}','${p.numero}')" style="background:#1a3a6a;border:1px solid #4a90d9;border-radius:4px;color:#4a90d9;cursor:pointer;padding:2px 6px;font-size:10px">✏️</button>
-        <button onclick="borrarPulsera('${p.id}','${p.numero}')" style="background:#3a0808;border:1px solid #e8001d;border-radius:4px;color:#e8001d;cursor:pointer;padding:2px 6px;font-size:10px">🗑</button>
+        <button data-id="${p.id}" data-num="${p.numero}" onclick="editarPulseraBtn(this)" style="background:#1a3a6a;border:1px solid #4a90d9;border-radius:4px;color:#4a90d9;cursor:pointer;padding:2px 6px;font-size:10px">✏️</button>
+        <button data-id="${p.id}" data-num="${p.numero}" onclick="borrarPulseraBtn(this)" style="background:#3a0808;border:1px solid #e8001d;border-radius:4px;color:#e8001d;cursor:pointer;padding:2px 6px;font-size:10px">🗑</button>
       </div>
     </div>`).join('');
 }
@@ -2462,17 +2475,36 @@ async function cargarResumenStock(){
   const ev=await getEventoActivo(); if(!ev)return;
   await cargarResumenAsignacion();
   document.getElementById('resumenStock').innerHTML=document.getElementById('resumenAsignacion').innerHTML;
-  // Detalle
-  const {data}=await dbP.from('pulseras').select('numero,tipo,estado').eq('evento_id',ev.id).order('numero');
+  // Detalle con id, editar y borrar
+  const {data}=await dbP.from('pulseras').select('id,numero,tipo,estado,vendedor_nombre').eq('evento_id',ev.id).order('numero');
   const det=document.getElementById('detalleStock');
-  if(!data||data.length===0){det.innerHTML='';return;}
+  if(!data||data.length===0){det.innerHTML='<p style="font-size:12px;color:#555;text-align:center;padding:12px">Sin pulseras para este evento.</p>';return;}
   const colores={sin_asignar:'#555',general:'#4caf50',parque_cerrado:'#4a90d9',vip:'#f0a800'};
-  det.innerHTML='<p style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px;margin:8px 0 6px">Detalle completo ('+data.length.toLocaleString()+' pulseras)</p>'+
-    data.map(p=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #1a1a1a;font-size:11px">
-      <span style="font-weight:700;color:#f0a800;letter-spacing:1px">#${p.numero}</span>
-      <span style="color:${colores[p.tipo]||'#666'}">${p.tipo==='sin_asignar'?'Sin asignar':p.tipo==='general'?'General':p.tipo==='parque_cerrado'?'Parque Cerrado':'VIP'}</span>
-      <span style="color:${p.estado==='disponible'?'#4caf50':p.estado==='asignada'?'#4a90d9':'#e8001d'}">${p.estado}</span>
+  const nomTipo=t=>t==='sin_asignar'?'Sin asignar':t==='general'?'General':t==='parque_cerrado'?'Parque Cerrado':'VIP';
+  det.innerHTML='<p style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px;margin:8px 0 6px">'+data.length.toLocaleString()+' pulseras</p>'+
+    data.map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #1a1a1a;font-size:11px;gap:4px">
+      <span style="font-weight:700;color:#f0a800;letter-spacing:1px;min-width:55px">#${p.numero}</span>
+      <span style="color:${colores[p.tipo]||'#666'};flex:1">${nomTipo(p.tipo)}</span>
+      <span style="color:${p.estado==='disponible'?'#4caf50':p.estado==='asignada'?'#4a90d9':'#e8001d'};min-width:52px">${p.estado}</span>
+      <div style="display:flex;gap:3px;flex-shrink:0">
+        <button data-id="${p.id}" data-num="${p.numero}" onclick="editarPulseraBtn(this)" style="background:#1a3a6a;border:1px solid #4a90d9;border-radius:4px;color:#4a90d9;cursor:pointer;padding:2px 5px;font-size:10px">✏️</button>
+        <button data-id="${p.id}" data-num="${p.numero}" onclick="borrarPulseraBtn(this)" style="background:#3a0808;border:1px solid #e8001d;border-radius:4px;color:#e8001d;cursor:pointer;padding:2px 5px;font-size:10px">🗑</button>
+      </div>
     </div>`).join('');
+}
+
+function borrarPulseraBtn(btn) {
+  const id = btn.getAttribute('data-id');
+  const num = btn.getAttribute('data-num');
+  if (!id || id === 'undefined') { alert('Error: ID no disponible. Recarga la página (Cmd+Shift+R).'); return; }
+  borrarPulsera(id, num);
+}
+
+function editarPulseraBtn(btn) {
+  const id = btn.getAttribute('data-id');
+  const num = btn.getAttribute('data-num');
+  if (!id || id === 'undefined') { alert('Error: ID no disponible. Recarga la página (Cmd+Shift+R).'); return; }
+  editarPulsera(id, num);
 }
 
 async function editarPulsera(id, numeroActual) {
