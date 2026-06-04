@@ -1412,7 +1412,9 @@ async function registrarVenta() {
   const nombreTipo = tipoObj.nombre.toLowerCase();
   const esTerceraOMenorV = nombreTipo.includes('tercera') || nombreTipo.includes('menor');
   const esInvitadoV = nombreTipo.includes('invitado');
-  const necesitaCatV = esTerceraOMenorV || esInvitadoV;
+  const esDiaAnteriorV = nombreTipo.includes('anterior');
+  const esTicketeraV = nombreTipo.includes('ticketera');
+  const necesitaCatV = esTerceraOMenorV || esInvitadoV || esDiaAnteriorV;
   if (necesitaCatV && !categoriaPulseraSeleccionada) {
     showErr('ventaError', 'Selecciona la categoría de pulsera (General o Parque Cerrado).');
     btn.disabled = false; btn.innerHTML = 'REGISTRAR VENTA'; return;
@@ -1430,7 +1432,7 @@ async function registrarVenta() {
   }
   // Medio de pago correcto según tipo
   let medioFinal;
-  if (esTicketera) medioFinal = 'ticketera';
+  if (esTicketeraV) medioFinal = 'ticketera';
   else if (esInvitadoV) medioFinal = 'invitado';
   else if (esTerceraOMenorV) medioFinal = 'gratuito';
   else if (esDiaAnteriorV) medioFinal = 'reingreso';
