@@ -1274,7 +1274,7 @@ function selTipoIdx(idx) {
   if (esTicketera) pagoSeleccionado = 'ticketera';
   if (esInvitado) pagoSeleccionado = 'invitado';
   if (esTerceraOMenor) pagoSeleccionado = 'gratuito';
-  if (esDiaAnterior) pagoSeleccionado = 'reingreso';
+  if (esDiaAnterior) pagoSeleccionado = 'gratuito';
   // Categoría pulsera — sub-botones manejan la categoría (NO resetear para gratuitos con categoría)
   const catSection = document.getElementById('categoriaPulseraSection');
   if (catSection) catSection.style.display = 'none';
@@ -1456,7 +1456,7 @@ async function registrarVenta() {
   if (esTicketeraV) medioFinal = 'ticketera';
   else if (esInvitadoV) medioFinal = 'invitado';
   else if (esTerceraOMenorV) medioFinal = 'gratuito';
-  else if (esDiaAnteriorV) medioFinal = 'reingreso';
+  else if (esDiaAnteriorV) medioFinal = 'gratuito';
   else medioFinal = pagoSeleccionado;
   const esGratuitoFinal = esTicketera || esInvitadoV || esTerceraOMenorV || esDiaAnteriorV;
   const estadoFinal = esGratuitoFinal ? 'confirmada' : pagoSeleccionado === 'transferencia' ? 'pendiente' : 'confirmada';
