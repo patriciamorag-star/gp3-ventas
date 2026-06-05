@@ -2384,7 +2384,7 @@ function pulseraTab(tab, btn) {
 async function getEventoActivo() {
   // Si eventoActivo existe pero no tiene id válido, re-consultar
   if(eventoActivo && eventoActivo.id) return eventoActivo;
-  const {data} = await db.from('neu_eventos').select('*').eq('activo',true).order('fecha',{ascending:false}).limit(1);
+  const {data} = await db.from('eventos').select('*').eq('activo',true).order('fecha',{ascending:false}).limit(1);
   if(data&&data.length>0){eventoActivo=data[0]; return eventoActivo;}
   return null;
 }
