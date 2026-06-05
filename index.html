@@ -2709,6 +2709,37 @@ function mostrarDashboard() {
   dashInterval = setInterval(cargarDashboard, 30000);
 }
 
+
+async function cargarPulserasDashboard() {
+  const dP = document.getElementById('dPulseras');
+  if (!dP) return;
+  const ev = await getEventoActivo();
+  if (!ev || !ev.id) { dP.innerHTML = '<div class="empty-state">Sin evento activo.</div>'; return; }
+  const { data: pulseras } = await dbP.from('pulseras').select('tipo,estado').eq('evento_id', ev.id);
+  if (!pulseras || pulseras.length === 0) {
+    dP.innerHTML = '<div class="empty-state"><div class="icon">🎫</div>Sin pulseras cargadas.</div>';
+    return;
+  }
+  const gen = pulseras.filter(p => p.tipo === 'general');
+  const pc = pulseras.filter(p => p.tipo === 'parque_cerrado');
+  const tG = gen.length, vG = gen.filter(p => p.estado === 'vendida').length;
+  const tP = pc.length, vP = pc.filter(p => p.estado === 'vendida').length;
+  dP.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <div style="background:#0d1f0d;border:1px solid #4caf50;border-radius:12px;padding:16px;text-align:center">
+      <p style="font-size:12px;color:#4caf50;margin-bottom:6px;font-weight:700">🟢 GENERAL</p>
+      <p style="font-size:30px;font-weight:800;color:#4caf50;line-height:1">${vG}</p>
+      <p style="font-size:11px;color:#888;margin-top:4px">vendidas de ${tG}</p>
+      <p style="font-size:13px;color:#fff;margin-top:6px">${tG - vG} disponibles</p>
+    </div>
+    <div style="background:#0a0d1f;border:1px solid #4a90d9;border-radius:12px;padding:16px;text-align:center">
+      <p style="font-size:12px;color:#4a90d9;margin-bottom:6px;font-weight:700">🔵 PARQUE CERRADO</p>
+      <p style="font-size:30px;font-weight:800;color:#4a90d9;line-height:1">${vP}</p>
+      <p style="font-size:11px;color:#888;margin-top:4px">vendidas de ${tP}</p>
+      <p style="font-size:13px;color:#fff;margin-top:6px">${tP - vP} disponibles</p>
+    </div>
+  </div>`;
+}
+
 async function cargarDashboard() {
   const { data: evento } = await db.from('eventos').select('*').eq('activo', true).single();
   const banner = document.getElementById('dashEventoBanner');
@@ -2735,17 +2766,7 @@ async function cargarDashboard() {
     document.getElementById('dStatEfectivo').textContent = formatMonto(0, dashMoneda);
     document.getElementById('dStatTransferencia').textContent = formatMonto(0, dashMoneda);
     document.getElementById('dCategorias').innerHTML = '<div class="empty-state">Sin ventas hoy.</div>';
-    // Pulseras incluso sin ventas
-    if (eventoActivo) {
-      const { data: pLotes0 } = await dbP.from('pulseras_lotes').select('*').eq('evento_id', eventoActivo.id);
-      const dP = document.getElementById('dPulseras');
-      if (dP && pLotes0 && pLotes0.length > 0) {
-        const gen0=pLotes0.filter(l=>l.tipo==='general'), pc0=pLotes0.filter(l=>l.tipo==='parque_cerrado');
-        const tG=gen0.reduce((s,l)=>s+l.total,0),vG=gen0.reduce((s,l)=>s+l.vendidas,0);
-        const tP=pc0.reduce((s,l)=>s+l.total,0),vP=pc0.reduce((s,l)=>s+l.vendidas,0);
-        dP.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px"><div style="background:#0d1f0d;border:1px solid #4caf50;border-radius:10px;padding:12px;text-align:center"><p style="font-size:11px;color:#4caf50;margin-bottom:4px">🟢 GENERAL</p><p style="font-size:22px;font-weight:800;color:#4caf50">${vG}</p><p style="font-size:11px;color:#555">${tG-vG} disp.</p></div><div style="background:#0a0d1f;border:1px solid #4a90d9;border-radius:10px;padding:12px;text-align:center"><p style="font-size:11px;color:#4a90d9;margin-bottom:4px">🔵 PARQUE CERRADO</p><p style="font-size:22px;font-weight:800;color:#4a90d9">${vP}</p><p style="font-size:11px;color:#555">${tP-vP} disp.</p></div></div>${pLotes0.map(l=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #222;font-size:13px"><span>${l.vendedor_nombre} · <span style="color:#666">${l.tipo==='general'?'General':'Parque Cerrado'}</span></span><span style="color:#f0a800;font-weight:600">${l.vendidas}/${l.total}</span></div>`).join('')}`;
-      } else if(dP) { dP.innerHTML='<p style="font-size:12px;color:#555">Sin lotes asignados.</p>'; }
-    }
+await cargarPulserasDashboard();
     return;
   }
 
@@ -2785,6 +2806,8 @@ async function cargarDashboard() {
 
   const el = document.getElementById('dashUltimaAct');
   if (el) el.textContent = new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+
+  await cargarPulserasDashboard();
 }
 
 window.addEventListener('load', function() {
